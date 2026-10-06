@@ -1,0 +1,142 @@
+==============================================================
+  OS-SIM PRO - COMO ABRIRLO (PASO A PASO)
+  Simulador de Sistema Operativo - Proyecto universitario de Felix
+==============================================================
+
+Repositorio: https://github.com/felixxcito/os-sim-pro  (privado)
+Version actual: 2.1.0  (CPU de 4 nucleos, 4 GB de RAM)
+
+
+--------------------------------------------------------------
+ OPCION 1 (LA MAS FACIL): ABRIRLO EN ESTA MAC DESDE LA CARPETA
+--------------------------------------------------------------
+El proyecto ya esta en tu Escritorio, en la carpeta "os-sim-pro".
+
+1. Abre la app "Terminal".
+   (Cmd + Espacio, escribe "Terminal" y pulsa Enter.)
+
+2. Copia y pega este comando y pulsa Enter:
+
+      cd ~/Desktop/os-sim-pro
+
+3. Copia y pega este otro y pulsa Enter:
+
+      npm run dev
+
+4. Espera unos segundos: se abre OS-Sim Pro a pantalla completa.
+
+   - Si es la primera vez en otra computadora, antes del paso 3
+     ejecuta:  npm install   (tarda 1 a 3 minutos).
+   - No cierres la Terminal mientras usas la app.
+
+
+--------------------------------------------------------------
+ OPCION 2: DESCARGAR EL EJECUTABLE (.dmg para Mac / .exe para Windows)
+--------------------------------------------------------------
+Sirve para abrirlo en cualquier computadora sin instalar nada mas.
+(El repositorio es privado: hay que iniciar sesion en GitHub con la
+cuenta felixxcito o con una cuenta invitada.)
+
+1. Entra a:  https://github.com/felixxcito/os-sim-pro/releases
+
+2. En la version mas reciente (v2.1.0), abre "Assets" y descarga:
+
+   - Mac con chip Apple (M1, M2, M3...):  OS-Sim-Pro-2.1.0-mac-arm64.dmg
+   - Mac con Intel (como esta Mac):        OS-Sim-Pro-2.1.0-mac-x64.dmg
+   - Windows (instalador):                 OS-Sim-Pro-Setup-2.1.0.exe
+   - Windows (sin instalar):               OS-Sim-Pro-2.1.0-portable.exe
+
+   Para saber que Mac tienes: menu Apple > "Acerca de esta Mac".
+   Si dice "Chip Apple M..." es arm64; si dice "Intel", es x64.
+
+3. MAC:
+   a) Abre el .dmg y arrastra "OS-Sim Pro" a la carpeta Aplicaciones.
+   b) La primera vez: clic derecho sobre la app > Abrir > Abrir.
+      (O bien: Ajustes del Sistema > Privacidad y seguridad >
+       "Abrir igualmente".)
+   c) Si dice que la app "esta danada", abre la Terminal y ejecuta:
+
+         xattr -cr "/Applications/OS-Sim Pro.app"
+
+4. WINDOWS:
+   a) Haz doble clic en el .exe.
+   b) Si sale "Windows protegio tu PC": pulsa "Mas informacion" y
+      luego "Ejecutar de todas formas".
+   c) El instalador crea un acceso directo "OS-Sim Pro" en el escritorio.
+
+
+--------------------------------------------------------------
+ OPCION 3: VERLO EN EL NAVEGADOR (version web, mas limitada)
+--------------------------------------------------------------
+1. En la Terminal:
+
+      cd ~/Desktop/os-sim-pro
+      npm run dev:web
+
+2. Abre en Chrome:  http://localhost:5173
+   (Con http://localhost:5173/?desktop se salta el arranque.)
+
+   Nota: en la version web el navegador interno es limitado y no hay
+   descargas. Para la presentacion usa la Opcion 1 o la 2.
+
+
+--------------------------------------------------------------
+ COMO SE USA
+--------------------------------------------------------------
+- Iniciar sesion ........ pulsa Enter en la pantalla de bloqueo.
+- Abrir aplicaciones .... doble clic en los iconos del escritorio,
+                          o el boton de Inicio (abajo a la izquierda).
+- Salir ................. Inicio > Apagar  (o Cmd + Q en Mac).
+- Pantalla completa ..... tecla F11 para entrar o salir.
+- Guardar / Abrir ....... Cmd/Ctrl + S  y  Cmd/Ctrl + O
+                          (en Escritor, Hojas y Bloc de notas).
+
+Aplicaciones:
+- Navegador ............. paginas web reales y descargas.
+- Escritor .............. como Word: abre y guarda .docx y exporta a PDF.
+- Hojas ................. como Excel: formulas (SUMA, PROMEDIO, SI...),
+                          abre y guarda .xlsx y .csv, graficos.
+- Explorador, Bloc de notas, Calculadora, Terminal, Visor, Papelera.
+- Administrador de tareas: el "cerebro" del simulador.
+
+
+--------------------------------------------------------------
+ GUION PARA LA DEMOSTRACION AL PROFESOR
+--------------------------------------------------------------
+1. Abre el Administrador de tareas > Procesos.
+   Cada app que abras aparece como un proceso (PID, memoria, CPU).
+
+2. Pestana "Recursos": se ven los 4 nucleos de la CPU trabajando
+   en paralelo (Round Robin) y la RAM de 4 GB.
+
+3. Pestana "Laboratorio" > "+5 procesos": la RAM se llena y aparecen
+   huecos grises (fragmentacion externa).
+   Luego pestana "Memoria" > "Compactar RAM": los huecos se juntan
+   al final de la memoria.
+
+4. "Laboratorio" > "Interbloqueo": el Proceso A retiene el Disco y
+   pide la Impresora; el B al reves. Sale el aviso rojo
+   "DEADLOCK DETECTADO". En "Recursos" se ve el grafo de espera y la
+   tabla del algoritmo de deteccion. Pulsa "Abortar victima".
+
+5. "Laboratorio" > "Inanicion": un proceso de baja prioridad no recibe
+   CPU. Activa "Envejecimiento (Aging)" y mira como sube su prioridad
+   hasta que se ejecuta.
+
+6. "Rendimiento": diagrama de Gantt (una fila por nucleo), uso de CPU y
+   RAM, tiempos de espera y de retorno.
+
+Documento tecnico para entregar:  docs/ANALISIS_TECNICO.md
+Guia detallada:                   COMO_EJECUTAR.md
+
+
+--------------------------------------------------------------
+ PROBLEMAS FRECUENTES
+--------------------------------------------------------------
+- "command not found: npm"  -> instala Node.js desde https://nodejs.org
+                               (version LTS) y abre una Terminal nueva.
+- Errores en "npm install"  -> borra la carpeta node_modules y repite.
+- "git clone" da error 404  -> el repo es privado: inicia sesion en
+                               GitHub con una cuenta que tenga acceso.
+- La app no abre en Mac     -> ver el punto 3 de la Opcion 2.
+==============================================================
