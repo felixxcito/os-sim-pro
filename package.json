@@ -14,7 +14,8 @@
     "dist:mac": "npm run build && electron-builder --mac --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never"
   },
-  "dependencies": {
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@tiptap/extension-highlight": "^3.31.4",
     "@tiptap/extension-image": "^3.31.4",
     "@tiptap/extension-table": "^3.31.4",
@@ -24,29 +25,28 @@
     "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "docx": "^9.8.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.52.0",
     "mammoth": "^1.13.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "recharts": "^3.10.1",
-    "zustand": "^5.0.15"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.4",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
-    "electron": "^44.5.1",
-    "electron-builder": "^26.15.3",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "zustand": "^5.0.15"
   },
   "description": "OS-Sim Pro: simulador de sistema operativo de escritorio (proyecto universitario)",
   "author": "Felix",
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "dependencies": {},
+  "homepage": "https://github.com/felixxcito/os-sim-pro"
 }

@@ -17,6 +17,7 @@ mac:
   icon: build/icon.png
 dmg:
   title: OS-Sim Pro
+  artifactName: OS-Sim-Pro-${version}-mac-${arch}.${ext}
 win:
   target:
     - target: nsis
@@ -25,6 +26,7 @@ win:
       arch: [x64]
   icon: build/icon.png
 nsis:
+  artifactName: OS-Sim-Pro-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
