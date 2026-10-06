@@ -10,7 +10,7 @@ las aplicaciones; cada icono abre una ventana del dashboard (Control, Procesos, 
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # http://localhost:5173  (guía completa: COMO_EJECUTAR.md)
 npm test         # tests del motor (Vitest)
 npm run build    # typecheck + build de producción
 ```
