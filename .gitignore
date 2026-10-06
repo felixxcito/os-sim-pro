@@ -5,3 +5,5 @@ dist
 coverage
 *.tsbuildinfo
 .claude/
+dist-electron
+release

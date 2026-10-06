@@ -1,0 +1,41 @@
+appId: com.felix.ossimpro
+productName: OS-Sim Pro
+copyright: Felix · Proyecto universitario
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+asar: true
+mac:
+  category: public.app-category.education
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  icon: build/icon.png
+dmg:
+  title: OS-Sim Pro
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: OS-Sim Pro
+portable:
+  artifactName: OS-Sim-Pro-${version}-portable.exe
+linux:
+  target: AppImage
+  icon: build/icon.png
+publish:
+  provider: github
+  owner: felixxcito
+  repo: os-sim-pro
+  releaseType: release
