@@ -1,4 +1,4 @@
-import type { Process, Rng, SimState } from '../types';
+import type { Process, Rng, SchedulingPolicy, SimState } from '../types';
 import { STARVATION_THRESHOLD } from './constants';
 import { addProcess, logEvent } from './state';
 
@@ -11,9 +11,19 @@ import { addProcess, logEvent } from './state';
 
 export const FLOOD_DURATION = 60;
 
-export function detectStarvation(processes: Process[], tick: number): number[] {
+/**
+ * - Listo: en RR puro la espera está acotada por una vuelta de la cola ((n-1)·q), así que no
+ *   puede haber inanición de CPU; solo se vigila con RR por prioridades.
+ * - Nuevo: un proceso que no consigue memoria durante el doble del umbral sufre inanición de memoria
+ *   (típico de procesos grandes con RAM fragmentada).
+ */
+export function detectStarvation(processes: Process[], tick: number, policy: SchedulingPolicy): number[] {
   return processes
-    .filter((p) => (p.state === 'Ready' || (p.state === 'New' && p.arrivalTime <= tick)) && p.waitStreak >= STARVATION_THRESHOLD)
+    .filter((p) =>
+      p.state === 'Ready'
+        ? policy === 'RR_PRIORITY' && p.waitStreak >= STARVATION_THRESHOLD
+        : p.state === 'New' && p.arrivalTime <= tick && p.waitStreak >= STARVATION_THRESHOLD * 2,
+    )
     .map((p) => p.pid);
 }
 

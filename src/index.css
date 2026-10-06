@@ -1,1 +1,77 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-neon-green: #39ff14;
+  --color-neon-cyan: #00e5ff;
+  --color-neon-pink: #ff00e5;
+  --color-alert: #ff3b3b;
+  --color-warn: #ffb300;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  @apply bg-gray-900 text-gray-200 font-sans antialiased;
+}
+
+/* Fondo de pantalla: la foto del usuario, con un velo oscuro para mantener legibilidad. */
+.wallpaper {
+  background-image: url("/assets/photo.webp");
+  background-size: cover;
+  background-position: center 30%;
+}
+
+.wallpaper-veil {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(0 229 255 / 0.08), transparent 60%),
+    linear-gradient(to bottom, rgb(3 7 18 / 0.35), rgb(3 7 18 / 0.55) 55%, rgb(3 7 18 / 0.85));
+}
+
+.scanlines {
+  background-image: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 3px);
+}
+
+.glass {
+  @apply bg-gray-950/80 backdrop-blur-xl;
+}
+
+.neon-text-green {
+  color: var(--color-neon-green);
+  text-shadow: 0 0 8px rgb(57 255 20 / 0.6);
+}
+
+.neon-text-cyan {
+  color: var(--color-neon-cyan);
+  text-shadow: 0 0 8px rgb(0 229 255 / 0.55);
+}
+
+/* Huecos de fragmentación externa en el mapa de memoria. */
+.fragment {
+  background-image: repeating-linear-gradient(135deg, rgb(156 163 175 / 0.45) 0 6px, rgb(75 85 99 / 0.35) 6px 12px);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 229 255 / 0.3) transparent;
+}
+
+@keyframes alarm {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(255 59 59 / 0.7); }
+  50% { box-shadow: 0 0 24px 6px rgb(255 59 59 / 0.45); }
+}
+
+.alarm {
+  animation: alarm 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alarm { animation: none; }
+  * { transition-duration: 0ms !important; }
+}

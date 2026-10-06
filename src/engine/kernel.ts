@@ -382,10 +382,10 @@ export class Kernel {
   }
 
   detectStarvation() {
-    const starving = detectStarvation([...this.procs.values()], this.tick);
+    const starving = detectStarvation([...this.procs.values()], this.tick, this.config.policy);
     for (const pid of starving) {
       if (!this.starving.includes(pid)) {
-        this.log('starvation', `INANICIÓN: ${this.label(pid)} lleva ${this.proc(pid).waitStreak} ticks sin recibir CPU/memoria`, pid);
+        this.log('starvation', `INANICIÓN: ${this.label(pid)} lleva ${this.proc(pid).waitStreak} ticks esperando ${this.proc(pid).state === 'New' ? 'memoria' : 'CPU'}`, pid);
       }
     }
     this.starving = starving;
