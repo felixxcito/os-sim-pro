@@ -9,7 +9,7 @@ import type {
   SimEvent,
   SimState,
 } from '../types';
-import { CPU_WINDOW, EVENT_LIMIT, GANTT_LIMIT, HISTORY_LIMIT, STARVATION_THRESHOLD } from './constants';
+import { CPU_WINDOW, EVENT_LIMIT, GANTT_LIMIT, HISTORY_LIMIT, STARVATION_THRESHOLD, TERMINATED_LIMIT } from './constants';
 import { allocate, free, isBlockedByFragmentation, memoryStats } from './memory';
 import { releaseResource, requestResource, type Resources } from './resources';
 import { applyAging, selectNext } from './scheduler';
@@ -79,9 +79,16 @@ export class Kernel {
   }
 
   toState(): SimState {
+    // En sesiones largas solo se conserva el historial de los últimos procesos terminados.
+    let processes = [...this.procs.values()];
+    const done = processes.filter((p) => p.state === 'Terminated');
+    if (done.length > TERMINATED_LIMIT) {
+      const drop = new Set(done.slice(0, done.length - TERMINATED_LIMIT).map((p) => p.pid));
+      processes = processes.filter((p) => !drop.has(p.pid));
+    }
     return {
       tick: this.tick,
-      processes: [...this.procs.values()],
+      processes,
       readyQueue: this.readyQueue,
       running: this.running,
       lastPid: this.lastPid,
@@ -378,7 +385,7 @@ export class Kernel {
   /** Los servicios del sistema despiertan de vez en cuando con un poco de trabajo. */
   backgroundWork(rng: Rng) {
     for (const p of this.procs.values()) {
-      if (p.kind !== 'system' || !p.awaitingInput || rng() > 0.1) continue;
+      if (p.kind !== 'system' || !p.awaitingInput || rng() > 0.04) continue;
       this.addWork(p, 1 + Math.floor(rng() * 3));
     }
   }

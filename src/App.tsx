@@ -1,5 +1,5 @@
-import { Desktop } from './components/desktop/Desktop';
+import { OsRoot } from './os/shell/OsRoot';
 
 export default function App() {
-  return <Desktop />;
+  return <OsRoot />;
 }

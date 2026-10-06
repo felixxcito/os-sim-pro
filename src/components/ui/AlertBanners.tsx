@@ -3,7 +3,7 @@ import { useSimStore } from '../../store/useSimStore';
 import { Button } from './primitives';
 
 /** Alertas globales sobre el escritorio: interbloqueo (rojo) e inanición (ámbar). */
-export function AlertBanners() {
+export function AlertBanners({ compact = false }: { compact?: boolean }) {
   const sim = useSimStore((s) => s.sim);
   const resolve = useSimStore((s) => s.resolveDeadlock);
   const setConfig = useSimStore((s) => s.setConfig);
@@ -11,7 +11,7 @@ export function AlertBanners() {
   const byPid = new Map(sim.processes.map((p) => [p.pid, p]));
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-3 z-[9998] flex flex-col items-center gap-2 px-4">
+    <div className={`pointer-events-none flex flex-col items-center gap-2 px-4 ${compact ? '' : 'absolute inset-x-0 top-3 z-[9998]'}`}>
       {sim.deadlock.length > 0 && (
         <div role="alert" className="alarm pointer-events-auto flex max-w-2xl flex-wrap items-center gap-3 rounded-xl border-2 border-red-500 bg-red-950/90 px-4 py-2.5 backdrop-blur">
           <ShieldAlert className="text-red-400" size={26} />

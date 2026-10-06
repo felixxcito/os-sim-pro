@@ -6,6 +6,7 @@ export const STARVATION_THRESHOLD = 25; // ticks esperando sin CPU
 export const HISTORY_LIMIT = 240;
 export const GANTT_LIMIT = 400;
 export const EVENT_LIMIT = 300;
+export const TERMINATED_LIMIT = 80; // procesos terminados que se conservan para estadísticas
 export const CPU_WINDOW = 10; // ticks para la media móvil de CPU
 
 export const RESOURCE_NAMES: Record<ResourceId, string> = {

@@ -16,6 +16,7 @@ import { useSimStore, SPEEDS } from '../../store/useSimStore';
 import type { ResourceId } from '../../types';
 import { IO_DEVICES, RESOURCE_NAMES } from '../../engine/constants';
 import { Button, SectionTitle, Segmented } from '../ui/primitives';
+import { confirmDialog } from '../../os/session';
 
 export function ControlPanel() {
   const { sim, running, speedMs, toggle, stepOnce, reset, setSpeed, addRandom, launchDeadlock, launchStarvation, compact, setConfig } =
@@ -53,7 +54,11 @@ export function ControlPanel() {
           <Button tone="cyan" onClick={stepOnce} disabled={running} icon={<SkipForward size={14} />}>
             Paso
           </Button>
-          <Button onClick={reset} icon={<RotateCcw size={14} />}>
+          <Button
+            onClick={async () => (await confirmDialog('¿Reiniciar el núcleo?', 'Se cierran todas las aplicaciones abiertas y la simulación vuelve a empezar.', true)) && reset()}
+            icon={<RotateCcw size={14} />}
+            title="Reinicia el núcleo (cierra todas las apps)"
+          >
             Reiniciar
           </Button>
         </div>

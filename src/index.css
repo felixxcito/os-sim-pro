@@ -30,8 +30,8 @@ body {
 
 .wallpaper-veil {
   background:
-    radial-gradient(ellipse at 50% 0%, rgb(0 229 255 / 0.08), transparent 60%),
-    linear-gradient(to bottom, rgb(3 7 18 / 0.35), rgb(3 7 18 / 0.55) 55%, rgb(3 7 18 / 0.85));
+    radial-gradient(ellipse at 50% 0%, rgb(0 229 255 / 0.06), transparent 60%),
+    linear-gradient(to bottom, rgb(3 7 18 / 0.1), rgb(3 7 18 / 0.25) 60%, rgb(3 7 18 / 0.55));
 }
 
 .scanlines {
@@ -75,3 +75,33 @@ body {
   .alarm { animation: none; }
   * { transition-duration: 0ms !important; }
 }
+
+/* Página del Escritor (procesador de texto): estilos de documento sobre el reset de Tailwind. */
+.doc-page .tiptap {
+  outline: none;
+  min-height: 900px;
+  font-family: Calibri, Inter, Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+.doc-page .tiptap h1 { font-size: 24pt; font-weight: 700; margin: 0 0 8pt; }
+.doc-page .tiptap h2 { font-size: 18pt; font-weight: 700; margin: 12pt 0 6pt; }
+.doc-page .tiptap h3 { font-size: 14pt; font-weight: 600; margin: 10pt 0 4pt; }
+.doc-page .tiptap p { margin: 0 0 6pt; }
+.doc-page .tiptap ul { list-style: disc; padding-left: 24pt; margin: 0 0 6pt; }
+.doc-page .tiptap ol { list-style: decimal; padding-left: 24pt; margin: 0 0 6pt; }
+.doc-page .tiptap blockquote { border-left: 3px solid #cbd5e1; padding-left: 12pt; color: #475569; margin: 6pt 0; }
+.doc-page .tiptap a { color: #0563c1; text-decoration: underline; }
+.doc-page .tiptap hr { border: 0; border-top: 1px solid #cbd5e1; margin: 12pt 0; }
+.doc-page .tiptap img { max-width: 100%; height: auto; }
+.doc-page .tiptap mark { padding: 0 2px; border-radius: 2px; }
+.doc-page .tiptap code { background: #f1f5f9; padding: 0 3px; border-radius: 3px; font-family: "JetBrains Mono", monospace; }
+.doc-page .tiptap table { border-collapse: collapse; width: 100%; margin: 6pt 0; table-layout: fixed; }
+.doc-page .tiptap td, .doc-page .tiptap th { border: 1px solid #94a3b8; padding: 4pt 6pt; vertical-align: top; position: relative; }
+.doc-page .tiptap th { background: #f1f5f9; font-weight: 600; }
+.doc-page .tiptap .selectedCell::after { content: ""; position: absolute; inset: 0; background: rgb(14 165 233 / 0.15); pointer-events: none; }
+.doc-page .tiptap .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: #38bdf8; pointer-events: none; }
+.doc-page .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #94a3b8; float: left; height: 0; pointer-events: none; }
+
+/* El texto de documentos y campos sí se puede seleccionar aunque el escritorio no. */
+.select-text, input, textarea, [contenteditable="true"] { user-select: text; }

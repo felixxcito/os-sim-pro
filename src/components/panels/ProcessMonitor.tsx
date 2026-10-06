@@ -119,14 +119,20 @@ function ProcessRow({
           {p.pid}
         </span>
       </td>
-      <td className="max-w-[130px] truncate px-2 py-1.5 text-gray-200" title={p.name}>
+      <td className="max-w-[180px] truncate px-2 py-1.5 text-gray-200" title={p.name}>
         {p.name}
+        {p.kind !== 'user' && (
+          <span className={`ml-1 rounded px-1 py-px text-[9px] font-semibold uppercase ${p.kind === 'app' ? 'bg-cyan-400/15 text-cyan-300' : 'bg-gray-700/60 text-gray-400'}`}>
+            {p.kind === 'app' ? 'app' : 'sistema'}
+          </span>
+        )}
         {deadlocked && <Lock size={11} className="ml-1 inline text-red-400" aria-label="En interbloqueo" />}
         {starving && <Hourglass size={11} className="ml-1 inline text-amber-300" aria-label="En inanición" />}
       </td>
       <td className="px-2 py-1.5">
         <StateBadge state={p.state} />
         {future && <span className="ml-1 text-[10px] text-gray-500">llega t={p.arrivalTime}</span>}
+        {p.awaitingInput && <span className="ml-1 text-[10px] text-gray-500">esperando usuario</span>}
       </td>
       <td className="px-2 py-1.5 font-mono">
         {p.priority}
@@ -179,7 +185,7 @@ function ProcessRow({
             onClick={onKill}
             className="rounded p-0.5 text-gray-500 hover:bg-red-500/20 hover:text-red-300"
             aria-label={`Terminar P${p.pid}`}
-            title="Terminar proceso (kill)"
+            title="Finalizar tarea (kill)"
           >
             <X size={12} />
           </button>
