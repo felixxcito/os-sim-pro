@@ -61,7 +61,7 @@ describe('procesos interactivos (aplicaciones)', () => {
 
 describe('arranque del SO', () => {
   it('inicia los servicios del sistema y los mantiene vivos', () => {
-    const s = run(createOsState(), 40, () => 0.05);
+    const s = run(createOsState(), 40, () => 0.01);
     const services = s.processes.filter((p) => p.kind === 'system');
     expect(services).toHaveLength(SYSTEM_SERVICES.length);
     expect(services.every((p) => p.state !== 'Terminated')).toBe(true);

@@ -190,14 +190,17 @@ app.whenReady().then(async () => {
     if (!file.startsWith(DIST)) return new Response('Prohibido', { status: 403 });
     return net.fetch(pathToFileURL(file).toString());
   });
-  protocol.handle('osdisk', (req) => {
+  const serveDisk = (req: Request) => {
     const { pathname } = new URL(req.url);
     try {
       return net.fetch(pathToFileURL(disk.resolve(decodeURIComponent(pathname))).toString());
     } catch {
       return new Response('Prohibido', { status: 403 });
     }
-  });
+  };
+  protocol.handle('osdisk', serveDisk);
+  // El navegador simulado también puede abrir HTML/PDF del disco virtual.
+  session.fromPartition(BROWSER_PARTITION).protocol.handle('osdisk', serveDisk);
 
   buildMenu();
   registerIpc();
