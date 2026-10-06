@@ -49,7 +49,7 @@ function createWindow() {
     },
   });
   if (DEV_URL) win.loadURL(DEV_URL);
-  else win.loadURL('app://os/index.html');
+  else win.loadURL('app://os/index.html' + (SMOKE ? '?desktop' : ''));
   win.on('closed', () => (win = null));
   if (SMOKE) runSmoke(win, SMOKE);
 }

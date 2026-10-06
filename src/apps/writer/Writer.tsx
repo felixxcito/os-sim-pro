@@ -53,6 +53,8 @@ const printable = (editor: Editor, title: string) =>
 export default function Writer({ win }: AppProps) {
   const spawnIoTask = useSimStore((s) => s.spawnIoTask);
   const [, force] = useState(0);
+  // El archivo solo se carga cuando la vista del editor ya existe (evento create de TipTap).
+  const [created, setCreated] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -66,17 +68,19 @@ export default function Writer({ win }: AppProps) {
       CharacterCount,
     ],
     content: '',
+    onCreate: () => setCreated(true),
+    onDestroy: () => setCreated(false),
     onUpdate: () => doc.markDirty(),
     onSelectionUpdate: () => force((n) => n + 1),
     onTransaction: () => force((n) => n + 1),
   });
 
   const doc = useDocument(win, {
-    ready: Boolean(editor),
+    ready: created && Boolean(editor),
     extensions: ['docx', 'html', 'txt'],
     defaultName: 'Documento.docx',
     load: async (path) => {
-      if (!editor) return;
+      if (!editor || editor.isDestroyed) throw new Error('El editor aún no está listo');
       const ext = extname(path);
       if (ext === 'docx') {
         const mammoth = (await import('mammoth/mammoth.browser.js')).default;
