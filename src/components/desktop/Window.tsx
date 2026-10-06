@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { Suspense, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { Maximize2, Minimize2, Minus, X } from 'lucide-react';
 import { TASKBAR_HEIGHT, useWindowStore, type WindowState } from '../../store/useWindowStore';
 import { PhotoIcon } from '../ui/primitives';
@@ -83,7 +83,9 @@ export function Window({ app, win, mobile }: { app: AppDef; win: WindowState; mo
         </div>
       </header>
       <div className="scrollbar-thin min-h-0 flex-1 overflow-auto">
-        <Body />
+        <Suspense fallback={<div className="p-3 font-mono text-xs text-gray-500">Cargando…</div>}>
+          <Body />
+        </Suspense>
       </div>
       {!full && (
         <div

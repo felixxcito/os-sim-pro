@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { lazy, type ComponentType } from 'react';
 import { BarChart3, Cpu, MemoryStick, Network, SlidersHorizontal, Terminal, type LucideIcon } from 'lucide-react';
 import type { AppId } from '../../store/useWindowStore';
 import { ControlPanel } from '../panels/ControlPanel';
@@ -6,7 +6,9 @@ import { ProcessMonitor } from '../panels/ProcessMonitor';
 import { MemoryMap } from '../panels/MemoryMap';
 import { ResourceManager } from '../panels/ResourceManager';
 import { EventLog } from '../panels/EventLog';
-import { AnalysisPanel } from '../analysis/AnalysisPanel';
+
+// Recharts es la dependencia más pesada: el panel de análisis se carga bajo demanda.
+const AnalysisPanel = lazy(() => import('../analysis/AnalysisPanel').then((m) => ({ default: m.AnalysisPanel })));
 
 export interface AppDef {
   id: AppId;
