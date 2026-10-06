@@ -23,9 +23,22 @@ export function killProcess(state: SimState, pid: number, reason = 'terminado po
   const p = k.procs.get(pid);
   if (!p) return state;
   k.terminate(p, reason);
+  k.detectDeadlock();
   return k.toState();
 }
 
 export function updateConfig(state: SimState, patch: Partial<SimConfig>): SimState {
   return { ...state, config: { ...state.config, ...patch } };
+}
+
+/** Recuperación del interbloqueo: aborta a la víctima (menor prioridad; si empatan, la más joven). */
+export function resolveDeadlock(state: SimState): SimState {
+  if (state.deadlock.length === 0) return state;
+  const victims = state.processes.filter((p) => state.deadlock.includes(p.pid));
+  const victim = victims.reduce((a, b) => (b.priority > a.priority || (b.priority === a.priority && b.pid > a.pid) ? b : a));
+  const k = new Kernel(state);
+  k.log('deadlock', `Recuperación: se aborta a la víctima ${k.label(victim.pid)} para romper la espera circular`, victim.pid);
+  k.terminate(k.proc(victim.pid), 'abortado (víctima del interbloqueo)');
+  k.detectDeadlock();
+  return k.toState();
 }

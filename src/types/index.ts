@@ -7,7 +7,7 @@
 export type ProcessState = 'New' | 'Ready' | 'Running' | 'Blocked' | 'Terminated';
 
 /** Recursos exclusivos del sistema (la CPU se gestiona aparte, en el planificador). */
-export type ResourceId = 'HDD' | 'PRINTER' | 'USB';
+export type ResourceId = 'HDD' | 'PRINTER' | 'USB' | 'R1' | 'R2';
 
 export type AllocationStrategy = 'first-fit' | 'best-fit';
 

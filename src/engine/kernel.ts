@@ -4,6 +4,7 @@ import type {
   MemoryBlock,
   Process,
   ResourceId,
+  Rng,
   SimConfig,
   SimEvent,
   SimState,
@@ -12,6 +13,9 @@ import { CPU_WINDOW, EVENT_LIMIT, GANTT_LIMIT, HISTORY_LIMIT, STARVATION_THRESHO
 import { allocate, free, isBlockedByFragmentation, memoryStats } from './memory';
 import { releaseResource, requestResource, type Resources } from './resources';
 import { applyAging, selectNext } from './scheduler';
+import { detectDeadlock } from './deadlock';
+import { createProcess, type ProcessSpec } from './process';
+import { detectStarvation, floodSpec } from './starvation';
 
 const cloneProcess = (p: Process): Process => ({
   ...p,
@@ -109,6 +113,13 @@ export class Kernel {
 
   label(pid: number) {
     return `P${pid} (${this.proc(pid).name})`;
+  }
+
+  spawn(spec: ProcessSpec): Process {
+    const p = createProcess(this.nextPid++, spec);
+    this.procs.set(p.pid, p);
+    this.log('arrival', `Nuevo proceso ${p.name} (P${p.pid}) · ${p.memorySize} MB · ráfaga ${p.burstTime}`, p.pid);
+    return p;
   }
 
   enqueueReady(p: Process) {
@@ -346,6 +357,38 @@ export class Kernel {
         }
       }
     }
+  }
+
+  // ---------------------------------------------------------------- Escenarios
+
+  /** Escenario de inanición: genera un proceso prioritario cada 2 ticks mientras dure. */
+  generateFlood(rng: Rng) {
+    if (this.floodTicks <= 0) return;
+    this.floodTicks--;
+    if (this.tick % 2 === 0) this.spawn(floodSpec(rng, this.tick, this.config.quantum));
+    if (this.floodTicks === 0) this.log('starvation', 'Fin de la saturación de procesos prioritarios');
+  }
+
+  detectDeadlock() {
+    const cycle = detectDeadlock([...this.procs.values()], this.resources);
+    const isNew = cycle.some((pid) => !this.deadlock.includes(pid));
+    if (cycle.length && isNew) {
+      const desc = cycle
+        .map((pid) => `P${pid} espera ${this.resources[this.proc(pid).waitingFor!].name}`)
+        .join(' · ');
+      this.log('deadlock', `¡DEADLOCK DETECTADO! Espera circular entre ${cycle.map((p) => 'P' + p).join(' ↔ ')} (${desc})`);
+    }
+    this.deadlock = cycle;
+  }
+
+  detectStarvation() {
+    const starving = detectStarvation([...this.procs.values()], this.tick);
+    for (const pid of starving) {
+      if (!this.starving.includes(pid)) {
+        this.log('starvation', `INANICIÓN: ${this.label(pid)} lleva ${this.proc(pid).waitStreak} ticks sin recibir CPU/memoria`, pid);
+      }
+    }
+    this.starving = starving;
   }
 
   recordHistory() {

@@ -1,5 +1,5 @@
 import type { Process, ResourceId, ResourceRequest, Rng } from '../types';
-import { colorFor, RESOURCE_IDS } from './constants';
+import { colorFor, IO_DEVICES } from './constants';
 
 export interface ProcessSpec {
   name: string;
@@ -75,7 +75,7 @@ export function randomSpec(rng: Rng, arrivalTime: number, quantum: number): Proc
   const burstTime = randInt(rng, 4, 16);
   const requests: ProcessSpec['requests'] = [];
   if (rng() < 0.45) {
-    const resource: ResourceId = pick(rng, RESOURCE_IDS);
+    const resource: ResourceId = pick(rng, IO_DEVICES);
     requests.push({
       resource,
       at: randInt(rng, 1, burstTime - 1),
