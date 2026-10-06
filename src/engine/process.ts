@@ -23,6 +23,7 @@ export function createProcess(pid: number, spec: ProcessSpec): Process {
     kind: spec.kind ?? 'user',
     interactive: spec.interactive ?? false,
     awaitingInput: false,
+    cpu: null,
     state: 'New',
     burstTime: spec.burstTime,
     remainingTime: spec.burstTime,
@@ -94,7 +95,7 @@ export function randomSpec(rng: Rng, arrivalTime: number, quantum: number): Proc
     arrivalTime,
     priority: randInt(rng, 1, 10),
     quantum,
-    memorySize: randInt(rng, 2, 12) * 16,
+    memorySize: randInt(rng, 2, 16) * 32,
     requests,
   };
 }

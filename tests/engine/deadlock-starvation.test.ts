@@ -67,6 +67,14 @@ describe('escenario de interbloqueo', () => {
     expect(s.events.some((e) => e.message.includes('DEADLOCK DETECTADO'))).toBe(true);
   });
 
+  it.each([1, 2, 4, 8])('ocurre con %i núcleo(s) aunque otros procesos compitan por la CPU', (cores) => {
+    let s = createInitialState({ cores });
+    for (let i = 0; i < 5; i++) s = addProcess(s, { name: `bg${i}`, burstTime: 30, arrivalTime: 0, quantum: 3, memorySize: 32 });
+    s = launchDeadlockScenario(s);
+    s = run(s, 80); // con 1 núcleo, el segundo turno de A llega tras una vuelta completa de la cola
+    expect(s.deadlock).toEqual([6, 7]);
+  });
+
   it('también ocurre con otros procesos compitiendo por la CPU', () => {
     let s = createInitialState();
     for (let i = 0; i < 3; i++) s = addProcess(s, { name: `bg${i}`, burstTime: 30, arrivalTime: 0, quantum: 3, memorySize: 32 });

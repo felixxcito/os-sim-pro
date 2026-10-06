@@ -133,6 +133,7 @@ function ProcessRow({
         <StateBadge state={p.state} />
         {future && <span className="ml-1 text-[10px] text-gray-500">llega t={p.arrivalTime}</span>}
         {p.awaitingInput && <span className="ml-1 text-[10px] text-gray-500">esperando usuario</span>}
+        {p.state === 'Running' && p.cpu !== null && <span className="ml-1 font-mono text-[10px] text-green-300">CPU{p.cpu}</span>}
       </td>
       <td className="px-2 py-1.5 font-mono">
         {p.priority}

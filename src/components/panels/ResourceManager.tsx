@@ -12,38 +12,45 @@ const ICONS: Record<ResourceId, LucideIcon> = { HDD: HardDrive, PRINTER: Printer
 export function ResourceManager() {
   const sim = useSimStore((s) => s.sim);
   const byPid = useMemo(() => new Map(sim.processes.map((p) => [p.pid, p])), [sim.processes]);
-  const running = sim.running !== null ? byPid.get(sim.running) : undefined;
   const totalTicks = sim.busyTicks + sim.idleTicks + sim.overheadTicks;
   const utilization = totalTicks ? Math.round((sim.busyTicks / totalTicks) * 100) : 0;
   const lastSlot = sim.gantt[sim.gantt.length - 1];
 
   return (
     <div className="space-y-3 p-3">
-      <div className={`rounded-xl border p-3 ${running ? 'border-green-400/40 bg-green-400/5' : 'border-gray-700 bg-gray-900/60'}`}>
-        <div className="flex items-center gap-3">
-          <div className={`rounded-lg p-2 ${running ? 'bg-green-400/15 text-[#39ff14]' : 'bg-gray-800 text-gray-500'}`}>
-            <Cpu size={22} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-200">CPU</span>
-              <span className={`font-mono text-[11px] ${running ? 'text-green-300' : 'text-gray-500'}`}>
-                {lastSlot?.switching ? 'CAMBIO DE CONTEXTO' : running ? `Ocupada · P${running.pid}` : 'Libre (ociosa)'}
-              </span>
-            </div>
-            {running ? (
-              <>
-                <div className="truncate text-[11px] text-gray-400">
-                  {running.name} · quantum {running.quantumLeft}/{running.quantum}
+      <div className="rounded-xl border border-gray-700 bg-gray-900/60 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Cpu size={18} className="text-[#39ff14]" />
+          <span className="text-xs font-semibold text-gray-200">CPU · {sim.running.length} núcleos</span>
+          <span className="ml-auto font-mono text-[11px] text-gray-400">{(lastSlot?.cores ?? []).filter((c) => c.pid !== null).length} en uso</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {sim.running.map((_, core) => {
+            // Lo que ejecutó el núcleo en el último tick (como en el Gantt).
+            const slot = lastSlot?.cores[core];
+            const p = slot?.pid != null ? byPid.get(slot.pid) : undefined;
+            const switching = slot?.switching;
+            return (
+              <div key={core} className={`rounded-lg border px-2 py-1.5 ${p ? 'border-green-400/40 bg-green-400/5' : 'border-gray-800 bg-gray-950/40'}`}>
+                <div className="flex items-center justify-between font-mono text-[10px]">
+                  <span className="text-gray-400">CPU{core}</span>
+                  <span className={p ? 'text-green-300' : 'text-gray-500'}>{switching ? 'cambio ctx' : p ? `P${p.pid}` : 'libre'}</span>
                 </div>
-                <div className="mt-1">
-                  <ProgressBar value={running.executedTime} max={running.burstTime} color={running.color} />
-                </div>
-              </>
-            ) : (
-              <div className="text-[11px] text-gray-500">Sin proceso en ejecución</div>
-            )}
-          </div>
+                {p ? (
+                  <>
+                    <div className="truncate text-[11px] text-gray-300">
+                      {p.name} · q {p.quantumLeft}/{p.quantum}
+                    </div>
+                    <div className="mt-1">
+                      <ProgressBar value={p.executedTime} max={p.burstTime} color={p.color} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[11px] text-gray-600">ociosa</div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="mt-2 grid grid-cols-3 gap-2 text-center font-mono text-[10px] text-gray-400">
           <div>

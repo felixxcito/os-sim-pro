@@ -120,12 +120,15 @@ export async function runCommand(line: string, cwd: string): Promise<ShellResult
     case 'top': {
       const m = memoryStats(sim.sim.memory);
       const lines = [
-        `Tick ${sim.sim.tick} · CPU ${sim.sim.history.at(-1)?.cpu ?? 0}% · ${sim.sim.contextSwitches} cambios de contexto`,
+        `Tick ${sim.sim.tick} · CPU ${sim.sim.history.at(-1)?.cpu ?? 0}% (${sim.sim.running.length} núcleos) · ${sim.sim.contextSwitches} cambios de contexto`,
         `Memoria: total ${m.total} MB · usada ${m.used} MB · libre ${m.free} MB · huecos ${m.holes} · frag. externa ${m.externalFragmentation}%`,
       ];
       if (cmd === 'top') {
-        const running = sim.sim.processes.find((p) => p.pid === sim.sim.running);
-        lines.push(`En CPU: ${running ? `P${running.pid} ${running.name}` : 'ociosa'} · Cola de listos: ${sim.sim.readyQueue.map((p) => 'P' + p).join(' ') || '—'}`);
+        sim.sim.running.forEach((pid, core) => {
+          const p = sim.sim.processes.find((x) => x.pid === pid);
+          lines.push(`  CPU${core}: ${p ? `P${p.pid} ${p.name}` : 'ociosa'}`);
+        });
+        lines.push(`Cola de listos: ${sim.sim.readyQueue.map((p) => 'P' + p).join(' ') || '—'}`);
       }
       return ok(lines.join('\n'));
     }

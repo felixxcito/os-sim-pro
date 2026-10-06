@@ -13,7 +13,8 @@ export function GanttChart() {
   const [hover, setHover] = useState<string | null>(null);
   const slots = gantt.slice(-WINDOW);
   const byPid = useMemo(() => new Map(processes.map((p) => [p.pid, p])), [processes]);
-  const pids = [...new Set(slots.map((g) => g.pid).filter((p): p is number => p !== null))].sort((a, b) => a - b);
+  const pids = [...new Set(slots.flatMap((g) => g.cores.map((c) => c.pid)).filter((p): p is number => p !== null))].sort((a, b) => a - b);
+  const coreCount = slots[slots.length - 1]?.cores.length ?? 1;
 
   if (slots.length === 0) {
     return <Empty text="Inicia la simulación (Play o Paso) para construir el diagrama de Gantt." />;
@@ -35,13 +36,14 @@ export function GanttChart() {
                 </span>
                 {Array.from({ length: WINDOW }, (_, i) => {
                   const slot = slots[i];
-                  const on = slot?.pid === pid;
+                  const core = slot?.cores.findIndex((c) => c.pid === pid) ?? -1;
+                  const on = core !== -1;
                   return (
                     <span
                       key={i}
                       className="h-3.5 rounded-[2px]"
                       style={{ background: on ? p?.color : 'rgb(31 41 55 / 0.35)', boxShadow: on ? `0 0 4px ${p?.color}88` : undefined }}
-                      onMouseEnter={() => on && setHover(`t=${slot.tick} · P${pid} ${p?.name ?? ''}`)}
+                      onMouseEnter={() => on && setHover(`t=${slot.tick} · P${pid} ${p?.name ?? ''} · CPU${core}`)}
                       onMouseLeave={() => setHover(null)}
                     />
                   );
@@ -49,22 +51,27 @@ export function GanttChart() {
               </div>
             );
           })}
-          <div className="grid items-center gap-[2px] pt-1" style={{ gridTemplateColumns: cols }}>
-            <span className="font-mono text-[10px] text-gray-500">CPU</span>
-            {Array.from({ length: WINDOW }, (_, i) => {
-              const slot = slots[i];
-              const kind = !slot ? 'none' : slot.switching ? 'cs' : slot.pid === null ? 'idle' : 'busy';
-              return (
-                <span
-                  key={i}
-                  className={`h-2 rounded-[2px] ${kind === 'cs' ? 'fragment' : ''}`}
-                  style={{ background: kind === 'busy' ? '#0891b2' : kind === 'idle' ? '#374151' : kind === 'none' ? 'transparent' : undefined }}
-                  onMouseEnter={() => slot && setHover(`t=${slot.tick} · ${kind === 'cs' ? 'cambio de contexto' : kind === 'idle' ? 'CPU ociosa' : 'CPU ocupada'}`)}
-                  onMouseLeave={() => setHover(null)}
-                />
-              );
-            })}
-          </div>
+          {Array.from({ length: coreCount }, (_, core) => (
+            <div key={core} className={`grid items-center gap-[2px] ${core === 0 ? 'pt-1' : ''}`} style={{ gridTemplateColumns: cols }}>
+              <span className="font-mono text-[10px] text-gray-500">CPU{core}</span>
+              {Array.from({ length: WINDOW }, (_, i) => {
+                const c = slots[i]?.cores[core];
+                const proc = c?.pid != null ? byPid.get(c.pid) : undefined;
+                const kind = !c ? 'none' : c.switching ? 'cs' : c.pid === null ? 'idle' : 'busy';
+                return (
+                  <span
+                    key={i}
+                    className={`h-2 rounded-[2px] ${kind === 'cs' ? 'fragment' : ''}`}
+                    style={{ background: kind === 'busy' ? (proc?.color ?? '#0891b2') : kind === 'idle' ? '#374151' : kind === 'none' ? 'transparent' : undefined }}
+                    onMouseEnter={() =>
+                      c && setHover(`t=${slots[i].tick} · CPU${core}: ${kind === 'cs' ? 'cambio de contexto' : kind === 'idle' ? 'ociosa' : `P${c.pid} ${proc?.name ?? ''}`}`)
+                    }
+                    onMouseLeave={() => setHover(null)}
+                  />
+                );
+              })}
+            </div>
+          ))}
           <div className="grid gap-[2px] font-mono text-[9px] text-gray-600" style={{ gridTemplateColumns: cols }}>
             <span />
             {Array.from({ length: WINDOW }, (_, i) => (
@@ -78,7 +85,7 @@ export function GanttChart() {
       <div className="flex h-5 items-center justify-between text-[10px] text-gray-500">
         <span>{hover ?? `Últimos ${WINDOW} ticks · pasa el ratón por una celda`}</span>
         <span className="flex gap-3">
-          <Key className="bg-[#0891b2]" label="Ocupada" />
+          <Key className="bg-[#0891b2]" label="Ocupada (color del proceso)" />
           <Key className="bg-gray-700" label="Ociosa" />
           <Key className="fragment" label="Cambio de contexto" />
         </span>

@@ -80,6 +80,10 @@ function Kernel() {
         <Segmented label="Velocidad" value={speedMs} onChange={setSpeed} options={SPEEDS.map((s) => ({ value: s.ms, label: s.label }))} />
       </div>
       <div className={row}>
+        <span className="text-gray-300">Núcleos de la CPU</span>
+        <Segmented label="Núcleos" value={c.cores} onChange={(cores) => setConfig({ cores })} options={[1, 2, 4, 8].map((n) => ({ value: n, label: `${n}` }))} />
+      </div>
+      <div className={row}>
         <span className="text-gray-300">Quantum de Round Robin: {c.quantum} ticks</span>
         <input type="range" min={1} max={8} value={c.quantum} onChange={(e) => setConfig({ quantum: Number(e.target.value) })} className="w-40 accent-violet-400" aria-label="Quantum" />
       </div>

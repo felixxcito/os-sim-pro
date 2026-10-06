@@ -18,6 +18,12 @@ import { addProcess, logEvent } from '../state';
  * PID, nombre, estado, ráfaga total (burstTime), tiempo restante, llegada,
  * prioridad, quantum, memoria, recursos retenidos/pedidos y estadísticas.
  *
+ * MULTIPROCESADOR SIMÉTRICO (SMP, Silberschatz §5.5)
+ *   La CPU tiene `cores` núcleos que comparten UNA cola de listos. En cada tick, cada
+ *   núcleo libre toma el siguiente proceso de la cola, de modo que hasta `cores`
+ *   procesos avanzan en paralelo. Un proceso nunca se ejecuta en dos núcleos a la vez.
+ *   Cada núcleo tiene su propio quantum en curso y su propio cambio de contexto.
+ *
  * PLANIFICADOR ROUND ROBIN (Silberschatz §5.3.3)
  *   - La cola de listos es FIFO circular.
  *   - El proceso despachado ejecuta como máximo `quantum` ticks seguidos.
@@ -105,7 +111,7 @@ export function floodSpec(rng: Rng, tick: number, quantum: number) {
 /**
  * Escenario de inanición: activa RR con prioridades, lanza un proceso de prioridad 10
  * ("backup-lowprio") y satura la CPU con procesos cortos de prioridad 1–2 durante
- * FLOOD_DURATION ticks (uno cada 2 ticks, más trabajo del que la CPU puede atender).
+ * FLOOD_DURATION ticks (uno por núcleo cada 2 ticks: más trabajo del que la CPU puede atender).
  * Sin aging, el de baja prioridad no recibe CPU mientras dure la saturación.
  */
 export function forceStarvationScenario(state: SimState, rng: Rng = Math.random): SimState {
@@ -120,7 +126,7 @@ export function forceStarvationScenario(state: SimState, rng: Rng = Math.random)
     memorySize: 64,
     tag: 'starvation',
   });
-  for (let i = 0; i < 4; i++) s = addProcess(s, floodSpec(rng, state.tick, state.config.quantum));
+  for (let i = 0; i < 4 * state.config.cores; i++) s = addProcess(s, floodSpec(rng, state.tick, state.config.quantum));
   return s;
 }
 
@@ -131,8 +137,8 @@ export function forceStarvationScenario(state: SimState, rng: Rng = Math.random)
 export interface ProcessTable {
   processes: Process[];
   readyQueue: number[];
-  running: number | null;
-  lastPid: number | null;
+  running: (number | null)[];
+  lastPid: (number | null)[];
   contextSwitches: number;
   busyTicks: number;
   idleTicks: number;
@@ -149,8 +155,9 @@ const clonePcb = (p: Process): Process => ({
 export class ProcessManager {
   procs: Map<number, Process>;
   readyQueue: number[];
-  running: number | null;
-  lastPid: number | null;
+  /** Proceso en cada núcleo. */
+  running: (number | null)[];
+  lastPid: (number | null)[];
   contextSwitches: number;
   busyTicks: number;
   idleTicks: number;
@@ -163,8 +170,18 @@ export class ProcessManager {
   ) {
     this.procs = new Map(table.processes.map((p) => [p.pid, clonePcb(p)]));
     this.readyQueue = [...table.readyQueue];
-    this.running = table.running;
-    this.lastPid = table.lastPid;
+    const cores = Math.max(1, config.cores);
+    this.running = Array.from({ length: cores }, (_, c) => table.running[c] ?? null);
+    this.lastPid = Array.from({ length: cores }, (_, c) => table.lastPid[c] ?? null);
+    // Si se redujo el número de núcleos, lo que corría en los núcleos retirados vuelve a la cola.
+    for (const pid of table.running.slice(cores)) {
+      if (pid === null) continue;
+      const p = this.procs.get(pid);
+      if (p && p.state === 'Running') {
+        p.cpu = null;
+        this.enqueueReady(p);
+      }
+    }
     this.contextSwitches = table.contextSwitches;
     this.busyTicks = table.busyTicks;
     this.idleTicks = table.idleTicks;
@@ -197,31 +214,53 @@ export class ProcessManager {
     this.readyQueue = this.readyQueue.filter((x) => x !== pid);
   }
 
+  get cores() {
+    return this.running.length;
+  }
+
+  /** Núcleo en el que se ejecuta un proceso, o -1. */
+  coreOf(pid: number) {
+    return this.running.indexOf(pid);
+  }
+
+  /** Libera el núcleo que ocupaba el proceso (si ocupaba alguno). */
+  vacate(p: Process) {
+    const c = this.coreOf(p.pid);
+    if (c !== -1) this.running[c] = null;
+    p.cpu = null;
+  }
+
   /**
-   * DESPACHADOR: Ready → Running. Repone el quantum, restablece la prioridad base
-   * (fin del envejecimiento) y registra el cambio de contexto si cambia el proceso en CPU.
-   * Devuelve true si este tick se consume en el cambio de contexto (overhead).
+   * DESPACHADOR: Ready → Running en el núcleo `core`. Repone el quantum, restablece la
+   * prioridad base (fin del envejecimiento) y registra el cambio de contexto si en ese
+   * núcleo estaba otro proceso. `exclude` evita que un proceso que ya usó CPU en este
+   * tick (en otro núcleo) vuelva a ejecutarse en el mismo tick.
+   * Devuelve 'none' si no hay a quién despachar, 'switch' si el tick se consume en el
+   * cambio de contexto (overhead) y 'ok' si el proceso puede ejecutar ya.
    */
-  dispatch(tick: number): boolean {
-    const next = selectNext(this.readyQueue, this.procs, this.config.policy);
-    if (next === null) return false;
+  dispatch(core: number, tick: number, exclude: Set<number>): 'none' | 'switch' | 'ok' {
+    const candidates = this.readyQueue.filter((pid) => !exclude.has(pid));
+    const next = selectNext(candidates, this.procs, this.config.policy);
+    if (next === null) return 'none';
     this.removeFromReady(next);
     const p = this.get(next);
     p.state = 'Running';
+    p.cpu = core;
     p.quantumLeft = p.quantum;
     p.effectivePriority = p.priority;
     p.waitStreak = 0;
     if (p.startTime === null) p.startTime = tick;
-    this.running = next;
-    const prev = this.lastPid;
-    this.lastPid = next;
+    this.running[core] = next;
+    const prev = this.lastPid[core];
+    this.lastPid[core] = next;
+    const cpu = this.cores > 1 ? ` (CPU${core})` : '';
     if (prev === null || prev === next) {
-      this.log('dispatch', `Despachador: ${this.label(next)} → CPU`, next);
-      return false;
+      this.log('dispatch', `Despachador: ${this.label(next)} → CPU${this.cores > 1 ? core : ''}`, next);
+      return 'ok';
     }
     this.contextSwitches++;
-    this.log('context-switch', `Cambio de contexto: guarda PCB de P${prev} → carga PCB de ${this.label(next)}`, next);
-    return this.config.contextSwitchCost > 0;
+    this.log('context-switch', `Cambio de contexto${cpu}: guarda PCB de P${prev} → carga PCB de ${this.label(next)}`, next);
+    return this.config.contextSwitchCost > 0 ? 'switch' : 'ok';
   }
 
   /** Un tick de CPU para el proceso en ejecución: avanza su ráfaga y consume quantum. */
@@ -234,7 +273,7 @@ export class ProcessManager {
 
   /** Fin de quantum: Running → Ready (al final de la cola). La siguiente selección provoca el cambio de contexto. */
   preempt(p: Process) {
-    this.running = null;
+    this.vacate(p);
     this.enqueueReady(p);
     this.log('quantum', `${this.label(p.pid)} agotó su quantum (${p.quantum}) → final de la cola`, p.pid);
   }
@@ -244,7 +283,7 @@ export class ProcessManager {
     p.state = 'Blocked';
     p.awaitingInput = true;
     p.remainingTime = 0;
-    this.running = null;
+    this.vacate(p);
   }
 
   /** Añade ráfaga de CPU (interacción del usuario); si esperaba al usuario, vuelve a Ready. */
@@ -260,16 +299,16 @@ export class ProcessManager {
   }
 
   /** Contabiliza el tiempo de espera (Ready o Nuevo sin memoria) y de bloqueo de cada proceso. */
-  accountWaiting(tick: number, executedPid: number | null) {
+  accountWaiting(tick: number, executed: Set<number>) {
     for (const p of this.procs.values()) {
-      if (p.pid === executedPid) continue;
+      if (executed.has(p.pid)) continue;
       if (p.state === 'Blocked' && !p.awaitingInput) p.blockedTime++;
       if (this.isWaiting(p, tick)) {
         p.waitingTime++;
         p.waitStreak++;
       }
     }
-    if (this.config.aging) this.applyAging(tick, executedPid);
+    if (this.config.aging) this.applyAging(tick, executed);
   }
 
   private isWaiting(p: Process, tick: number) {
@@ -281,9 +320,9 @@ export class ProcessManager {
    * efectiva en 1 cada `agingInterval` ticks de espera continua.
    * Resuelve la inanición: tarde o temprano el proceso postergado supera a los recién llegados.
    */
-  applyAging(tick: number, executedPid: number | null = null) {
+  applyAging(tick: number, executed: Set<number> = new Set()) {
     for (const p of this.procs.values()) {
-      if (p.pid === executedPid || !this.isWaiting(p, tick)) continue;
+      if (executed.has(p.pid) || !this.isWaiting(p, tick)) continue;
       const before = p.effectivePriority;
       p.effectivePriority = applyAging(p, this.config.agingInterval).effectivePriority;
       if (p.effectivePriority !== before && (p.tag === 'starvation' || p.waitStreak >= STARVATION_THRESHOLD)) {

@@ -52,7 +52,7 @@ Código: `src/engine/managers/{ProcessManager,MemoryManager,ResourceManager}.ts`
 1. Avanza el reloj; si está activo, el escenario de inanición genera carga.
 2. **Memoria:** los procesos `New` que caben en RAM pasan a `Ready`.
 3. **E/S:** las operaciones en curso avanzan; las que terminan liberan el dispositivo y desbloquean al proceso.
-4. **CPU:** despacho Round Robin, peticiones dinámicas de recursos, ejecución y fin de quantum.
+4. **CPU (4 núcleos):** cada núcleo libre despacha de la cola de listos compartida (Round Robin), atiende las peticiones de recursos, ejecuta y aplica el fin de quantum.
 5. Contabilidad de esperas y **envejecimiento**.
 6. **Detección** de interbloqueo e inanición.
 7. Historial para las gráficas (uso de CPU, RAM ocupada y fragmentada).
@@ -77,11 +77,18 @@ Código: `src/engine/managers/{ProcessManager,MemoryManager,ResourceManager}.ts`
 
 El sistema arranca con **11 procesos precargados**: 5 servicios del sistema y 6 procesos de carga.
 
-### 2.2 Planificador Round Robin
+### 2.2 Planificador Round Robin en multiprocesador
+
+La CPU tiene **4 núcleos** (configurable a 1, 2, 4 u 8 en *Configuración → Núcleo y memoria*). Es un **multiprocesador simétrico (SMP)**:
+- hay una sola cola de listos compartida por todos los núcleos;
+- en cada tick, cada núcleo libre toma el siguiente proceso, así que hasta 4 procesos avanzan en paralelo;
+- un proceso nunca ocupa dos núcleos en el mismo tick;
+- cada núcleo lleva su propio quantum y su propio cambio de contexto;
+- la utilización de la CPU se mide en ticks-núcleo: ticks ocupados / (ticks × núcleos).
 
 ```
 cada tick:
-  si la CPU está libre:
+  para cada núcleo; si está libre:
       P ← cabeza de la cola de listos            (RR: FIFO)
       si P ≠ último proceso en CPU → CAMBIO DE CONTEXTO (guardar PCB anterior, cargar el de P)
       P.quantumLeft ← quantum
@@ -92,15 +99,18 @@ cada tick:
 
 - **Quantum configurable** de 1 a 8 ticks.
 - **Coste del cambio de contexto:** 0 o 1 tick. Con 1 tick se ve el *overhead* en el Gantt (celdas rayadas) y baja la utilización de la CPU.
+- **Gantt:** una fila por proceso y una fila por núcleo (CPU0…CPU3), coloreada con el proceso que ejecutó.
 - **Propiedad:** el tiempo de espera entre dos turnos está acotado por (n − 1) · q. Por eso Round Robin puro **no produce inanición**.
 
-*Test de ejemplo:* tres procesos con ráfaga 4 y q = 2 producen el Gantt `1 1 2 2 3 3 1 1 2 2 3 3` con 5 cambios de contexto.
+*Tests de ejemplo:*
+- con 1 núcleo, tres procesos con ráfaga 4 y q = 2 producen el Gantt `1 1 2 2 3 3 1 1 2 2 3 3` con 5 cambios de contexto;
+- con 2 núcleos, cuatro procesos se ejecutan de dos en dos: `(1,2) (1,2) (3,4) (3,4) …`.
 
 ### 2.3 Inanición y envejecimiento
 
 Con la variante **RR + prioridad**, siempre se elige el proceso con mejor prioridad efectiva. `forceStarvationScenario()` hace lo siguiente:
 - lanza `backup-lowprio` con prioridad 10;
-- durante 60 ticks genera un proceso de prioridad 1–2 cada 2 ticks, con más trabajo del que la CPU puede atender.
+- durante 60 ticks genera, cada 2 ticks, un proceso de prioridad 1–2 por núcleo: más trabajo del que la CPU puede atender.
 
 El proceso de baja prioridad nunca es elegido. Se detecta cuando lleva ≥ 25 ticks esperando y aparece el banner **INANICIÓN**.
 
@@ -114,7 +124,7 @@ El proceso de baja prioridad nunca es elegido. Se detecta cuando lleva ≥ 25 ti
 
 ### 3.1 Particionamiento dinámico
 
-La RAM (1024 MB, de los que 128 MB son del núcleo) es una lista ordenada de bloques `{inicio, tamaño, pid | hueco}`.
+La RAM (**4 GB = 4096 MB**, de los que 256 MB son del núcleo) es una lista ordenada de bloques `{inicio, tamaño, pid | hueco}`.
 
 **Política de colocación:**
 - **Primer ajuste (First-Fit):** usa el primer hueco suficiente. Es O(n) y se detiene antes.
@@ -164,12 +174,12 @@ Los procesos **piden recursos dinámicamente mientras se ejecutan**: cada PCB de
 
 ### 4.2 Generación — `forceDeadlockScenario()`
 
-| Proceso | Tick 1 de su ráfaga | Tick 2 de su ráfaga |
+| Proceso | Primer recurso | Segundo recurso |
 |---|---|---|
-| A | obtiene el **Disco** | pide la **Impresora** |
-| B | obtiene la **Impresora** | pide el **Disco** |
+| A | al ser despachado obtiene el **Disco** | en su 2.º turno pide la **Impresora** |
+| B | al ser despachado obtiene la **Impresora** | en su 2.º turno pide el **Disco** |
 
-Ambos tienen quantum = 2. A adquiere el disco y agota su quantum antes de pedir la impresora; entonces B adquiere la impresora. Cuando cada uno vuelve a la CPU, el recurso que pide ya está ocupado. Se cumplen las **cuatro condiciones de Coffman**:
+Ambos tienen quantum = 2. Como la cola de listos es FIFO, entre el primer y el segundo turno de A, B tiene que ser despachado (o lo fue a la vez en otro núcleo), y viceversa. Así, cada uno retiene su primer recurso antes de que el otro pida el segundo. El escenario se reproduce siempre, con 1, 2, 4 u 8 núcleos (test). Se cumplen las **cuatro condiciones de Coffman**:
 - exclusión mutua;
 - retener y esperar;
 - no expropiación;
@@ -220,13 +230,13 @@ Complejidad: O(m · n²). El Gestor de recursos muestra en vivo las matrices `Al
 
 ## 6. Verificación
 
-`npm test` ejecuta **41 pruebas automáticas**:
+`npm test` ejecuta **48 pruebas automáticas**:
 
 | Área | Qué se comprueba |
 |---|---|
-| Planificador | Orden Round Robin, cambios de contexto, coste del cambio, E/S |
+| Planificador | Orden Round Robin, cambios de contexto, coste del cambio, E/S, multinúcleo (paralelismo, un proceso por núcleo, uso de CPU) |
 | Memoria | First-Fit frente a Best-Fit, métricas de fragmentación, coalescencia, compactación |
-| Interbloqueo | Ciclo en el grafo, matrices, escenario forzado con y sin otros procesos, recuperación |
+| Interbloqueo | Ciclo en el grafo, matrices, escenario forzado con 1, 2, 4 y 8 núcleos y con otros procesos, recuperación |
 | Inanición | Detección; con aging se recibe CPU antes |
 | Procesos interactivos | Apps que esperan al usuario, admisión por memoria, ≥ 10 procesos al arrancar |
 | Ofimática | Motor de fórmulas (precedencia, funciones en es/en, ciclos `#CICLO!`); ida y vuelta .docx / .xlsx / .csv |

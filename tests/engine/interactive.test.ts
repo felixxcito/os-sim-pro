@@ -52,8 +52,8 @@ describe('procesos interactivos (aplicaciones)', () => {
   });
 
   it('una app que no cabe en memoria espera en estado Nuevo', () => {
-    let { state: s } = openApp(createInitialState(), 800);
-    const big = openApp(s, 512);
+    let { state: s } = openApp(createInitialState(), 3200);
+    const big = openApp(s, 1024);
     s = run(big.state, 3);
     expect(s.processes.find((x) => x.pid === big.pid)!.state).toBe('New');
   });

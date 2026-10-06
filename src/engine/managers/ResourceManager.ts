@@ -184,14 +184,15 @@ export function detectDeadlockMatrix(processes: Process[], resources: Resources)
 
 /**
  * Induce intencionalmente una ESPERA CIRCULAR entre dos procesos:
- *   Proceso A: obtiene el DISCO y, en su siguiente turno, pide la IMPRESORA.
- *   Proceso B: obtiene la IMPRESORA y, en su siguiente turno, pide el DISCO.
+ *   Proceso A: obtiene el DISCO nada más ser despachado y, en su siguiente turno, pide la IMPRESORA.
+ *   Proceso B: obtiene la IMPRESORA nada más ser despachado y, en su siguiente turno, pide el DISCO.
  *
- * ¿Por qué ocurre siempre? Ambos tienen quantum = 2 y piden su primer recurso tras
- * 1 tick de CPU y el segundo tras 2. Así, A adquiere el disco y agota su quantum
- * ANTES de pedir la impresora; entonces B adquiere la impresora. Cuando A vuelve,
- * la impresora está ocupada (A se bloquea reteniendo el disco) y cuando B vuelve, el
- * disco está ocupado (B se bloquea reteniendo la impresora): A → B → A.
+ * ¿Por qué ocurre siempre (con 1 o con varios núcleos)? Ambos tienen quantum = 2: piden
+ * el primer recurso al empezar (tras 0 ticks de CPU) y el segundo tras 2 ticks, es decir,
+ * ya en su SEGUNDO turno. Como la cola de listos es FIFO, entre el primer y el segundo
+ * turno de A el proceso B tiene que ser despachado (o lo fue a la vez en otro núcleo), y
+ * viceversa. Así cada uno retiene su primer recurso antes de que el otro pida el segundo:
+ * A espera la impresora que tiene B, y B espera el disco que tiene A → A → B → A.
  */
 export function forceDeadlockScenario(state: SimState): SimState {
   const common = { burstTime: 10, arrivalTime: state.tick, priority: 1, quantum: 2, memorySize: 32, tag: 'deadlock' as const };
@@ -200,7 +201,7 @@ export function forceDeadlockScenario(state: SimState): SimState {
     ...common,
     name: 'Proceso A',
     requests: [
-      { resource: 'HDD', at: 1, mode: 'hold', duration: 8 },
+      { resource: 'HDD', at: 0, mode: 'hold', duration: 8 },
       { resource: 'PRINTER', at: 2, mode: 'hold', duration: 6 },
     ],
   });
@@ -208,7 +209,7 @@ export function forceDeadlockScenario(state: SimState): SimState {
     ...common,
     name: 'Proceso B',
     requests: [
-      { resource: 'PRINTER', at: 1, mode: 'hold', duration: 8 },
+      { resource: 'PRINTER', at: 0, mode: 'hold', duration: 8 },
       { resource: 'HDD', at: 2, mode: 'hold', duration: 6 },
     ],
   });

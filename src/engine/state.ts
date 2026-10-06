@@ -9,18 +9,19 @@ export function createResources(): Record<ResourceId, Resource> {
 }
 
 export function createInitialState(config: Partial<SimConfig> = {}): SimState {
+  const cfg = { ...DEFAULT_CONFIG, ...config };
   return {
     tick: 0,
     processes: [],
     readyQueue: [],
-    running: null,
-    lastPid: null,
+    running: Array(cfg.cores).fill(null),
+    lastPid: Array(cfg.cores).fill(null),
     memory: [
       { start: 0, size: KERNEL_SIZE, pid: 0 },
       { start: KERNEL_SIZE, size: TOTAL_MEMORY - KERNEL_SIZE, pid: null },
     ],
     resources: createResources(),
-    config: { ...DEFAULT_CONFIG, ...config },
+    config: cfg,
     nextPid: 1,
     nextEventId: 1,
     contextSwitches: 0,

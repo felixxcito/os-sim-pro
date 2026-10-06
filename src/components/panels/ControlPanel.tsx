@@ -208,7 +208,7 @@ function CustomProcessForm() {
         </label>
         <label>
           Memoria (MB)
-          <input className={field} type="number" min={16} max={896} step={16} value={memory} onChange={(e) => setMemory(Number(e.target.value))} />
+          <input className={field} type="number" min={16} max={3840} step={32} value={memory} onChange={(e) => setMemory(Number(e.target.value))} />
         </label>
         <label>
           E/S

@@ -10,8 +10,8 @@ Proyecto universitario de Sistemas Operativos (Felix). Es un **programa de escri
 - Explorador de archivos, Bloc de notas, Calculadora, Visor de imágenes, Terminal y Configuración.
 
 Debajo de todo hay un **núcleo simulado**. Cada ventana abierta es un proceso con PID, memoria asignada y turnos de CPU. El **Administrador de tareas** muestra en vivo:
-- planificación **Round Robin** con quantum configurable y cambios de contexto;
-- memoria con **First-Fit / Best-Fit**, **fragmentación externa** y **compactación** animada;
+- CPU de **4 núcleos** con planificación **Round Robin** (quantum configurable) y cambios de contexto;
+- **4 GB de RAM** con **First-Fit / Best-Fit**, **fragmentación externa** y **compactación** animada;
 - recursos (CPU, RAM, Disco, Impresora, Pantalla, USB) con **detección de interbloqueo** por grafo de espera y por matrices;
 - **inanición** y **envejecimiento (aging)**;
 - gráficas: Gantt, uso de CPU y RAM, espera frente a ejecución.
@@ -25,9 +25,9 @@ En la pestaña **Releases** del repositorio:
 
 | Sistema | Archivo |
 |---|---|
-| Windows | `OS-Sim-Pro-Setup-2.0.1.exe` (instalador) o `OS-Sim-Pro-2.0.1-portable.exe` (sin instalar) |
-| Mac con chip Apple (M1/M2/M3…) | `OS-Sim-Pro-2.0.1-mac-arm64.dmg` |
-| Mac con Intel | `OS-Sim-Pro-2.0.1-mac-x64.dmg` |
+| Windows | `OS-Sim-Pro-Setup-2.1.0.exe` (instalador) o `OS-Sim-Pro-2.1.0-portable.exe` (sin instalar) |
+| Mac con chip Apple (M1/M2/M3…) | `OS-Sim-Pro-2.1.0-mac-arm64.dmg` |
+| Mac con Intel | `OS-Sim-Pro-2.1.0-mac-x64.dmg` |
 
 ## Desarrollo
 
@@ -35,7 +35,7 @@ En la pestaña **Releases** del repositorio:
 npm install
 npm run dev        # abre la app de escritorio (Electron) con recarga en caliente
 npm run dev:web    # versión web en http://localhost:5173 (añade ?desktop para saltar el arranque)
-npm test           # 41 tests: planificador, memoria, interbloqueo, inanición, fórmulas, .docx/.xlsx
+npm test           # 48 tests: planificador, memoria, interbloqueo, inanición, fórmulas, .docx/.xlsx
 npm run dist       # genera el ejecutable para tu sistema en release/
 ```
 

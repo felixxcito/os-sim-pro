@@ -1,7 +1,8 @@
 import type { ResourceId, SimConfig } from '../types';
 
-export const TOTAL_MEMORY = 1024; // MB
-export const KERNEL_SIZE = 128; // MB reservados al núcleo
+export const TOTAL_MEMORY = 4096; // MB (4 GB)
+export const KERNEL_SIZE = 256; // MB reservados al núcleo
+export const DEFAULT_CORES = 4;
 export const STARVATION_THRESHOLD = 25; // ticks esperando sin CPU
 export const HISTORY_LIMIT = 240;
 export const GANTT_LIMIT = 400;
@@ -32,6 +33,7 @@ export const DEFAULT_CONFIG: SimConfig = {
   aging: false,
   agingInterval: 2,
   contextSwitchCost: 0,
+  cores: DEFAULT_CORES,
 };
 
 export const PROCESS_COLORS = [

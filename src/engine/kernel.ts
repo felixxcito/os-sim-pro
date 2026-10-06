@@ -1,4 +1,4 @@
-import type { GanttSlot, HistoryPoint, Process, ResourceId, Rng, SimEvent, SimState } from '../types';
+import type { CoreSlot, GanttSlot, HistoryPoint, Process, ResourceId, Rng, SimEvent, SimState } from '../types';
 import { CPU_WINDOW, EVENT_LIMIT, GANTT_LIMIT, HISTORY_LIMIT, STARVATION_THRESHOLD, TERMINATED_LIMIT } from './constants';
 import { MemoryManager } from './managers/MemoryManager';
 import { floodSpec, ProcessManager } from './managers/ProcessManager';
@@ -32,8 +32,8 @@ export class Kernel {
   gantt: GanttSlot[];
   history: HistoryPoint[];
   events: SimEvent[];
-  /** PID que ejecutó en el tick actual (no acumula espera). */
-  executedPid: number | null = null;
+  /** PIDs que usaron CPU en el tick actual (no acumulan espera ni pueden repetir núcleo). */
+  executed = new Set<number>();
 
   constructor(s: SimState) {
     this.tick = s.tick;
@@ -233,13 +233,12 @@ export class Kernel {
   /** Terminación: libera memoria y recursos (despertando a quien esperaba). */
   terminate(p: Process, reason = 'terminó') {
     if (p.state === 'Terminated') return;
-    const wasRunning = this.pm.running === p.pid;
     p.state = 'Terminated';
     p.finishTime = this.tick;
     p.waitingFor = null;
     p.ioRemaining = 0;
     this.pm.removeFromReady(p.pid);
-    if (wasRunning) this.pm.running = null;
+    this.pm.vacate(p);
     if (p.memoryBase !== null) {
       this.mm.release(p.pid);
       p.memoryBase = null;
@@ -249,31 +248,36 @@ export class Kernel {
     this.log('terminate', `${this.label(p.pid)} ${reason} · retorno ${p.finishTime - p.arrivalTime} · espera ${p.waitingTime}`, p.pid);
   }
 
-  /** Un tick de CPU con Round Robin (despacho, peticiones, ejecución, fin de quantum). */
+  /**
+   * Un tick de CPU: cada núcleo (multiprocesador simétrico) ejecuta su proceso o, si está
+   * libre, despacha el siguiente de la cola de listos compartida (Round Robin).
+   */
   runCpu() {
-    let used = false;
-    let switching = false;
-    this.executedPid = null;
+    this.executed = new Set();
+    const cores = this.pm.running.map((_, core) => this.runCore(core));
+    this.gantt = [...this.gantt, { tick: this.tick, cores }].slice(-GANTT_LIMIT);
+  }
 
-    for (let guard = 0; !used && guard < 64; guard++) {
-      if (this.pm.running === null) {
-        if (this.pm.readyQueue.length === 0) break;
-        if (this.pm.dispatch(this.tick)) {
-          switching = true;
-          used = true;
+  /** Un tick en un núcleo: despacho, peticiones de recursos, ejecución y fin de quantum. */
+  private runCore(core: number): CoreSlot {
+    for (let guard = 0; guard < 64; guard++) {
+      if (this.pm.running[core] === null) {
+        const r = this.pm.dispatch(core, this.tick, this.executed);
+        if (r === 'none') break;
+        if (r === 'switch') {
           this.pm.overheadTicks++;
-          break;
+          this.executed.add(this.pm.running[core]!);
+          return { pid: null, switching: true };
         }
       }
-      const p = this.proc(this.pm.running!);
+      const p = this.proc(this.pm.running[core]!);
       if (this.handleRequests(p)) {
-        this.pm.running = null;
-        continue; // la CPU queda libre: se despacha otro en este mismo tick
+        this.pm.vacate(p);
+        continue; // el núcleo queda libre: se despacha otro en este mismo tick
       }
 
       this.pm.executeTick(p);
-      used = true;
-      this.executedPid = p.pid;
+      this.executed.add(p.pid);
 
       for (const rid of [...p.heldResources]) {
         const at = p.releaseAt[rid];
@@ -283,14 +287,14 @@ export class Kernel {
       if (p.remainingTime <= 0 && p.interactive) this.pm.blockForInput(p);
       else if (p.remainingTime <= 0) this.terminate(p);
       else if (p.quantumLeft <= 0) this.pm.preempt(p);
+      return { pid: p.pid, switching: false };
     }
-
-    if (!used) this.pm.idleTicks++;
-    this.gantt = [...this.gantt, { tick: this.tick, pid: this.executedPid, switching }].slice(-GANTT_LIMIT);
+    this.pm.idleTicks++;
+    return { pid: null, switching: false };
   }
 
   accountWaiting() {
-    this.pm.accountWaiting(this.tick, this.executedPid);
+    this.pm.accountWaiting(this.tick, this.executed);
   }
 
   addWork(p: Process, ticks: number, cap = 8) {
@@ -303,7 +307,7 @@ export class Kernel {
   generateFlood(rng: Rng) {
     if (this.floodTicks <= 0) return;
     this.floodTicks--;
-    if (this.tick % 2 === 0) this.spawn(floodSpec(rng, this.tick, this.config.quantum));
+    if (this.tick % 2 === 0) for (let c = 0; c < this.pm.cores; c++) this.spawn(floodSpec(rng, this.tick, this.config.quantum));
     if (this.floodTicks === 0) this.log('starvation', 'Fin de la saturación de procesos prioritarios');
   }
 
@@ -340,10 +344,11 @@ export class Kernel {
   recordHistory() {
     const s = this.mm.stats();
     const window = this.gantt.slice(-CPU_WINDOW);
-    const busy = window.filter((g) => g.pid !== null).length;
+    const slots = window.flatMap((g) => g.cores);
+    const busy = slots.filter((c) => c.pid !== null).length;
     const point: HistoryPoint = {
       tick: this.tick,
-      cpu: window.length ? Math.round((busy / window.length) * 100) : 0,
+      cpu: slots.length ? Math.round((busy / slots.length) * 100) : 0,
       memUsed: Math.round((s.used / s.total) * 1000) / 10,
       memFragmented: Math.round((s.fragmented / s.total) * 1000) / 10,
       memFree: Math.round((s.largestHole / s.total) * 1000) / 10,

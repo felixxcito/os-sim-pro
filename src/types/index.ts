@@ -44,6 +44,8 @@ export interface Process {
   interactive: boolean;
   /** Bloqueado esperando entrada del usuario (teclado/ratón). */
   awaitingInput: boolean;
+  /** Núcleo de CPU en el que se está ejecutando (null si no está en ejecución). */
+  cpu: number | null;
   state: ProcessState;
   burstTime: number;
   remainingTime: number;
@@ -120,13 +122,18 @@ export interface SimEvent {
   pid?: number;
 }
 
-/** Una celda del diagrama de Gantt: qué ocupó la CPU en un tick. */
-export interface GanttSlot {
-  tick: number;
-  /** PID ejecutado, null = CPU ociosa. */
+/** Qué hizo un núcleo de CPU durante un tick. */
+export interface CoreSlot {
+  /** PID ejecutado, null = núcleo ocioso. */
   pid: number | null;
   /** El tick se consumió en un cambio de contexto (overhead). */
   switching: boolean;
+}
+
+/** Una columna del diagrama de Gantt: lo que hizo cada núcleo en un tick. */
+export interface GanttSlot {
+  tick: number;
+  cores: CoreSlot[];
 }
 
 export interface HistoryPoint {
@@ -161,21 +168,25 @@ export interface SimConfig {
   agingInterval: number;
   /** Ticks que cuesta un cambio de contexto (0 o 1). */
   contextSwitchCost: number;
+  /** Núcleos de la CPU (multiprocesador simétrico). */
+  cores: number;
 }
 
 export interface SimState {
   tick: number;
   processes: Process[];
   readyQueue: number[];
-  running: number | null;
-  /** Último PID que ocupó la CPU (para detectar cambios de contexto). */
-  lastPid: number | null;
+  /** Proceso en ejecución en cada núcleo (null = núcleo libre). */
+  running: (number | null)[];
+  /** Último PID que ocupó cada núcleo (para detectar cambios de contexto). */
+  lastPid: (number | null)[];
   memory: MemoryBlock[];
   resources: Record<ResourceId, Resource>;
   config: SimConfig;
   nextPid: number;
   nextEventId: number;
   contextSwitches: number;
+  /** Contadores en ticks-núcleo (con 4 núcleos, cada tick suma 4 entre los tres). */
   busyTicks: number;
   idleTicks: number;
   overheadTicks: number;

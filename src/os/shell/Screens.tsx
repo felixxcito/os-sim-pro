@@ -3,10 +3,12 @@ import { ArrowRight, Power } from 'lucide-react';
 import { PhotoIcon } from '../../components/ui/primitives';
 import { useSession } from '../session';
 import { Wallpaper } from './Wallpaper';
+import { DEFAULT_CORES, KERNEL_SIZE, TOTAL_MEMORY } from '../../engine/constants';
 
 const BOOT_LINES = [
   'Cargando núcleo OS-Sim 2.0…',
-  '[ OK ] Inicializando memoria: 1024 MB, núcleo 128 MB',
+  `[ OK ] Inicializando memoria: ${TOTAL_MEMORY / 1024} GB (${TOTAL_MEMORY} MB), núcleo ${KERNEL_SIZE} MB`,
+  `[ OK ] CPU: ${DEFAULT_CORES} núcleos (multiprocesador simétrico)`,
   '[ OK ] Particionamiento dinámico (First-Fit)',
   '[ OK ] Planificador Round Robin, quantum = 3',
   '[ OK ] Registrando dispositivos: Disco duro, Impresora, Pantalla, USB',
