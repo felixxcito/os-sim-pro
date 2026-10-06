@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import type { ResourceId, SimConfig, SimState } from '../types';
 import { addWork, compactMemory, killProcess, resolveDeadlock, updateConfig } from '../engine/actions';
-import { launchDeadlockScenario } from '../engine/deadlock';
+import { forceDeadlockScenario } from '../engine/managers/ResourceManager';
 import type { ProcessSpec } from '../engine/process';
 import { addProcess, addRandomProcess, createOsState, spawnProcess } from '../engine/state';
-import { launchStarvationScenario } from '../engine/starvation';
+import { forceStarvationScenario } from '../engine/managers/ProcessManager';
 import { step } from '../engine/tick';
 
 export const SPEEDS = [
@@ -114,9 +114,9 @@ export const useSimStore = create<SimStore>((set, get) => {
         }),
       ),
     compact: () => apply(compactMemory),
-    launchDeadlock: () => apply(launchDeadlockScenario),
+    launchDeadlock: () => apply(forceDeadlockScenario),
     resolveDeadlock: () => apply(resolveDeadlock),
-    launchStarvation: () => apply((s) => launchStarvationScenario(s)),
+    launchStarvation: () => apply((s) => forceStarvationScenario(s)),
     setConfig: (patch) =>
       apply((s) => {
         let next = updateConfig(s, patch);

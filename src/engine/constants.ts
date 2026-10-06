@@ -10,17 +10,20 @@ export const TERMINATED_LIMIT = 80; // procesos terminados que se conservan para
 export const CPU_WINDOW = 10; // ticks para la media móvil de CPU
 
 export const RESOURCE_NAMES: Record<ResourceId, string> = {
-  HDD: 'Disco HDD',
-  PRINTER: 'Impresora (E/S)',
-  USB: 'Puerto USB (E/S)',
-  R1: 'R1 · Unidad de cinta',
-  R2: 'R2 · Escáner',
+  HDD: 'Disco duro',
+  PRINTER: 'Impresora',
+  SCREEN: 'Pantalla',
+  USB: 'Puerto USB',
 };
 
 export const RESOURCE_IDS = Object.keys(RESOURCE_NAMES) as ResourceId[];
 
-/** Dispositivos que usan los procesos aleatorios (R1/R2 se reservan al escenario de interbloqueo). */
-export const IO_DEVICES: ResourceId[] = ['HDD', 'PRINTER', 'USB'];
+/**
+ * Dispositivos de E/S que usan los procesos de carga aleatorios. El Disco y la Impresora
+ * quedan para el escenario de interbloqueo, las descargas y la impresión, de modo que la
+ * espera circular Disco ↔ Impresora se reproduzca siempre igual.
+ */
+export const IO_DEVICES: ResourceId[] = ['SCREEN', 'USB'];
 
 export const DEFAULT_CONFIG: SimConfig = {
   quantum: 3,

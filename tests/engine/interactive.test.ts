@@ -60,6 +60,10 @@ describe('procesos interactivos (aplicaciones)', () => {
 });
 
 describe('arranque del SO', () => {
+  it('arranca con al menos 10 procesos precargados', () => {
+    expect(createOsState(() => 0.5).processes.length).toBeGreaterThanOrEqual(10);
+  });
+
   it('inicia los servicios del sistema y los mantiene vivos', () => {
     const s = run(createOsState(), 40, () => 0.01);
     const services = s.processes.filter((p) => p.kind === 'system');

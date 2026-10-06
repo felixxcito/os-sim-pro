@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Combine } from 'lucide-react';
 import { useSimStore } from '../../store/useSimStore';
+import { useOS } from '../../store/useOS';
 import { isBlockedByFragmentation, memoryStats } from '../../engine/memory';
 import { Button, SectionTitle, Segmented, Stat } from '../ui/primitives';
 
@@ -9,9 +10,8 @@ export function MemoryMap() {
   const compact = useSimStore((s) => s.compact);
   const setConfig = useSimStore((s) => s.setConfig);
   const stats = useMemo(() => memoryStats(sim.memory), [sim.memory]);
-  const byPid = useMemo(() => new Map(sim.processes.map((p) => [p.pid, p])), [sim.processes]);
+  const { memoryMap } = useOS();
   const waiting = sim.processes.filter((p) => p.state === 'New' && p.waitStreak > 0);
-  const lastIndex = sim.memory.length - 1;
 
   return (
     <div className="space-y-3 p-3">
@@ -52,20 +52,18 @@ export function MemoryMap() {
 
         {/* Barra de memoria: cada bloque se posiciona por dirección; al compactar, la transición anima el desplazamiento. */}
         <div className="relative h-16 overflow-hidden rounded-lg border border-gray-700 bg-gray-950" role="img" aria-label="Mapa de memoria RAM">
-          {sim.memory.map((b, i) => {
-            const left = (b.start / stats.total) * 100;
-            const width = (b.size / stats.total) * 100;
-            const style = { left: `${left}%`, width: `${width}%` };
+          {memoryMap.map((b) => {
+            const style = { left: `${b.left}%`, width: `${b.width}%` };
             const cls = 'absolute top-0 bottom-0 transition-[left,width] duration-700 ease-in-out border-r border-gray-950/80';
-            if (b.pid === 0) {
+            if (b.kind === 'kernel') {
               return (
                 <div key="kernel" className={`${cls} flex items-center justify-center bg-slate-700/80`} style={style} title={`Núcleo del SO · ${b.size} MB`}>
                   <span className="font-mono text-[10px] font-bold tracking-widest text-slate-200">KERNEL</span>
                 </div>
               );
             }
-            if (b.pid === null) {
-              const isFragment = i !== lastIndex;
+            if (b.kind === 'fragment' || b.kind === 'free') {
+              const isFragment = b.kind === 'fragment';
               return (
                 <div
                   key={`free-${b.start}`}
@@ -73,25 +71,24 @@ export function MemoryMap() {
                   style={style}
                   title={`${isFragment ? 'Hueco (fragmentación externa)' : 'Memoria libre'} · @${b.start} · ${b.size} MB`}
                 >
-                  {width > 6 && <span className="font-mono text-[9px] text-gray-300/80">{b.size}</span>}
+                  {b.width > 6 && <span className="font-mono text-[9px] text-gray-300/80">{b.size}</span>}
                 </div>
               );
             }
-            const p = byPid.get(b.pid);
-            const color = p?.color ?? '#888';
+            const color = b.color ?? '#888';
             return (
               <div
                 key={`p-${b.pid}`}
                 className={`${cls} flex flex-col items-center justify-center overflow-hidden`}
                 style={{ ...style, background: `${color}33`, boxShadow: `inset 0 0 0 1px ${color}aa, inset 0 -3px 0 ${color}` }}
-                title={`P${b.pid} ${p?.name ?? ''} · @${b.start} · ${b.size} MB`}
+                title={`P${b.pid} ${b.name ?? ''} · @${b.start} · ${b.size} MB`}
               >
-                {width > 3.5 && (
+                {b.width > 3.5 && (
                   <span className="font-mono text-[10px] font-bold" style={{ color }}>
                     P{b.pid}
                   </span>
                 )}
-                {width > 6 && <span className="font-mono text-[9px] text-gray-400">{b.size}</span>}
+                {b.width > 6 && <span className="font-mono text-[9px] text-gray-400">{b.size}</span>}
               </div>
             );
           })}

@@ -1,49 +1,31 @@
-import type {
-  GanttSlot,
-  HistoryPoint,
-  MemoryBlock,
-  Process,
-  ResourceId,
-  Rng,
-  SimConfig,
-  SimEvent,
-  SimState,
-} from '../types';
+import type { GanttSlot, HistoryPoint, Process, ResourceId, Rng, SimEvent, SimState } from '../types';
 import { CPU_WINDOW, EVENT_LIMIT, GANTT_LIMIT, HISTORY_LIMIT, STARVATION_THRESHOLD, TERMINATED_LIMIT } from './constants';
-import { allocate, free, isBlockedByFragmentation, memoryStats } from './memory';
-import { releaseResource, requestResource, type Resources } from './resources';
-import { applyAging, selectNext } from './scheduler';
-import { detectDeadlock } from './deadlock';
+import { MemoryManager } from './managers/MemoryManager';
+import { floodSpec, ProcessManager } from './managers/ProcessManager';
+import { ResourceManager, type Resources } from './managers/ResourceManager';
 import { createProcess, type ProcessSpec } from './process';
-import { detectStarvation, floodSpec } from './starvation';
-
-const cloneProcess = (p: Process): Process => ({
-  ...p,
-  resourcesNeeded: p.resourcesNeeded.map((r) => ({ ...r })),
-  heldResources: [...p.heldResources],
-  releaseAt: { ...p.releaseAt },
-});
 
 /**
- * Núcleo del simulador. Trabaja sobre una COPIA del estado: dentro de un tick
- * muta sus campos por claridad, pero nunca modifica el SimState recibido.
- * Así `step()` sigue siendo una función pura y testeable.
+ * ============================================================================
+ *  NÚCLEO — integra los tres administradores en el ciclo de reloj
+ * ============================================================================
+ *
+ *   ProcessManager  → PCB, cola de listos, Round Robin, cambios de contexto, aging
+ *   MemoryManager   → particiones, First/Best-Fit, fragmentación, compactación
+ *   ResourceManager → dispositivos exclusivos, colas de espera, interbloqueo
+ *
+ * El núcleo trabaja sobre una COPIA del estado (los administradores clonan lo que
+ * reciben): dentro de un tick muta sus campos por claridad, pero nunca modifica el
+ * SimState de entrada. Por eso `step()` sigue siendo una función pura y testeable.
  */
 export class Kernel {
   tick: number;
-  procs: Map<number, Process>;
-  readyQueue: number[];
-  running: number | null;
-  lastPid: number | null;
-  memory: MemoryBlock[];
-  resources: Resources;
-  config: SimConfig;
+  pm: ProcessManager;
+  mm: MemoryManager;
+  rm: ResourceManager;
+  config: SimState['config'];
   nextPid: number;
   nextEventId: number;
-  contextSwitches: number;
-  busyTicks: number;
-  idleTicks: number;
-  overheadTicks: number;
   floodTicks: number;
   deadlock: number[];
   starving: number[];
@@ -55,21 +37,17 @@ export class Kernel {
 
   constructor(s: SimState) {
     this.tick = s.tick;
-    this.procs = new Map(s.processes.map((p) => [p.pid, cloneProcess(p)]));
-    this.readyQueue = [...s.readyQueue];
-    this.running = s.running;
-    this.lastPid = s.lastPid;
-    this.memory = s.memory.map((b) => ({ ...b }));
-    this.resources = Object.fromEntries(
-      Object.entries(s.resources).map(([id, r]) => [id, { ...r, queue: [...r.queue] }]),
-    ) as unknown as Resources;
     this.config = { ...s.config };
+    this.pm = new ProcessManager(s, this.config, (kind, msg, pid) => this.log(kind, msg, pid));
+    this.mm = new MemoryManager(
+      s.memory.map((b) => ({ ...b })),
+      this.config.strategy,
+    );
+    this.rm = new ResourceManager(
+      Object.fromEntries(Object.entries(s.resources).map(([id, r]) => [id, { ...r, queue: [...r.queue] }])) as unknown as Resources,
+    );
     this.nextPid = s.nextPid;
     this.nextEventId = s.nextEventId;
-    this.contextSwitches = s.contextSwitches;
-    this.busyTicks = s.busyTicks;
-    this.idleTicks = s.idleTicks;
-    this.overheadTicks = s.overheadTicks;
     this.floodTicks = s.floodTicks;
     this.deadlock = [...s.deadlock];
     this.starving = [...s.starving];
@@ -78,9 +56,14 @@ export class Kernel {
     this.events = [...s.events];
   }
 
+  /** Acceso directo a la tabla de procesos (lo usan las acciones del usuario). */
+  get procs() {
+    return this.pm.procs;
+  }
+
   toState(): SimState {
     // En sesiones largas solo se conserva el historial de los últimos procesos terminados.
-    let processes = [...this.procs.values()];
+    let processes = this.pm.all();
     const done = processes.filter((p) => p.state === 'Terminated');
     if (done.length > TERMINATED_LIMIT) {
       const drop = new Set(done.slice(0, done.length - TERMINATED_LIMIT).map((p) => p.pid));
@@ -89,18 +72,18 @@ export class Kernel {
     return {
       tick: this.tick,
       processes,
-      readyQueue: this.readyQueue,
-      running: this.running,
-      lastPid: this.lastPid,
-      memory: this.memory,
-      resources: this.resources,
+      readyQueue: this.pm.readyQueue,
+      running: this.pm.running,
+      lastPid: this.pm.lastPid,
+      memory: this.mm.blocks,
+      resources: this.rm.resources,
       config: this.config,
       nextPid: this.nextPid,
       nextEventId: this.nextEventId,
-      contextSwitches: this.contextSwitches,
-      busyTicks: this.busyTicks,
-      idleTicks: this.idleTicks,
-      overheadTicks: this.overheadTicks,
+      contextSwitches: this.pm.contextSwitches,
+      busyTicks: this.pm.busyTicks,
+      idleTicks: this.pm.idleTicks,
+      overheadTicks: this.pm.overheadTicks,
       floodTicks: this.floodTicks,
       deadlock: this.deadlock,
       starving: this.starving,
@@ -115,49 +98,48 @@ export class Kernel {
   }
 
   proc(pid: number): Process {
-    return this.procs.get(pid)!;
+    return this.pm.get(pid);
   }
 
   label(pid: number) {
-    return `P${pid} (${this.proc(pid).name})`;
+    return this.pm.label(pid);
   }
 
   spawn(spec: ProcessSpec): Process {
     const p = createProcess(this.nextPid++, spec);
-    this.procs.set(p.pid, p);
+    this.pm.add(p);
     this.log('arrival', `Nuevo proceso ${p.name} (P${p.pid}) · ${p.memorySize} MB · ráfaga ${p.burstTime}`, p.pid);
     return p;
   }
 
-  enqueueReady(p: Process) {
-    p.state = 'Ready';
-    if (!this.readyQueue.includes(p.pid)) this.readyQueue.push(p.pid);
-  }
+  // ------------------------------------------------------------ Memoria (paso 2 del tick)
 
-  // ---------------------------------------------------------------- Memoria
-
-  /** Admite procesos nuevos cargándolos en RAM (New → Ready). */
+  /**
+   * Admisión de largo plazo: los procesos que llegaron (New) se cargan en RAM si el
+   * MemoryManager encuentra un hueco contiguo (New → Ready). Si no, esperan.
+   */
   admitArrivals() {
-    const candidates = [...this.procs.values()]
+    const candidates = this.pm
+      .all()
       .filter((p) => p.state === 'New' && p.arrivalTime <= this.tick)
       .sort((a, b) => a.arrivalTime - b.arrivalTime || a.pid - b.pid);
 
     for (const p of candidates) {
-      const res = allocate(this.memory, p.pid, p.memorySize, this.config.strategy);
-      if (res) {
-        this.memory = res.blocks;
-        p.memoryBase = res.base;
+      const base = this.mm.allocate(p.pid, p.memorySize);
+      if (base !== null) {
+        p.memoryBase = base;
         p.waitStreak = 0;
         p.effectivePriority = p.priority;
-        this.enqueueReady(p);
-        this.log('admit', `${this.label(p.pid)} cargado en RAM @${res.base} MB (${this.config.strategy})`, p.pid);
+        this.pm.enqueueReady(p);
+        this.log('admit', `${this.label(p.pid)} cargado en RAM @${base} MB (${this.config.strategy})`, p.pid);
         continue;
       }
       if (p.waitStreak === 0) {
-        const s = memoryStats(this.memory);
-        const reason = isBlockedByFragmentation(this.memory, p.memorySize)
-          ? `fragmentación externa: ${s.free} MB libres pero el mayor hueco es de ${s.largestHole} MB`
-          : `memoria insuficiente (${s.free} MB libres)`;
+        const s = this.mm.stats();
+        const reason =
+          this.mm.whyNotFit(p.memorySize) === 'fragmentation'
+            ? `fragmentación externa: ${s.free} MB libres pero el mayor hueco es de ${s.largestHole} MB`
+            : `memoria insuficiente (${s.free} MB libres)`;
         this.log('memory', `${this.label(p.pid)} no cabe (${p.memorySize} MB) → ${reason}`, p.pid);
       }
       // Con aging activo, un proceso que lleva demasiado esperando memoria "reserva" la
@@ -171,9 +153,9 @@ export class Kernel {
     }
   }
 
-  // ---------------------------------------------------------------- Recursos
+  // ------------------------------------------------------------ Recursos
 
-  /** El proceso recibe un recurso por el que esperaba (o al pedirlo libre). */
+  /** El proceso recibe un recurso por el que esperaba (al liberarlo su poseedor anterior). */
   grant(pid: number, rid: ResourceId) {
     const p = this.proc(pid);
     const req = p.resourcesNeeded.find((r) => r.resource === rid && r.status === 'waiting');
@@ -181,68 +163,64 @@ export class Kernel {
     req.status = 'granted';
     p.waitingFor = null;
     p.heldResources.push(rid);
-    this.log('acquire', `${this.label(pid)} obtiene ${this.resources[rid].name}`, pid);
+    this.log('acquire', `${this.label(pid)} obtiene ${this.rm.resources[rid].name}`, pid);
     if (req.mode === 'io') {
       p.ioRemaining = req.duration;
     } else {
       p.releaseAt[rid] = p.executedTime + req.duration;
-      this.enqueueReady(p);
+      this.pm.enqueueReady(p);
       this.log('unblock', `${this.label(pid)} desbloqueado → Listo`, pid);
     }
   }
 
   release(pid: number, rid: ResourceId) {
     const p = this.proc(pid);
-    const { resources, nextHolder } = releaseResource(this.resources, rid, pid);
-    this.resources = resources;
+    const nextHolder = this.rm.release(pid, rid);
     if (p.heldResources.includes(rid)) {
       p.heldResources = p.heldResources.filter((r) => r !== rid);
       delete p.releaseAt[rid];
       const req = p.resourcesNeeded.find((r) => r.resource === rid && r.status === 'granted');
       if (req) req.status = 'done';
-      this.log('release', `${this.label(pid)} libera ${this.resources[rid].name}`, pid);
+      this.log('release', `${this.label(pid)} libera ${this.rm.resources[rid].name}`, pid);
     }
     if (nextHolder !== null) this.grant(nextHolder, rid);
   }
 
   /** Avanza las operaciones de E/S en curso (Blocked → Ready al terminar). */
   progressIO() {
-    const inIO = [...this.procs.values()].filter((p) => p.state === 'Blocked' && p.ioRemaining > 0);
+    const inIO = this.pm.all().filter((p) => p.state === 'Blocked' && p.ioRemaining > 0);
     for (const p of inIO) {
       p.ioRemaining--;
       if (p.ioRemaining > 0) continue;
       const req = p.resourcesNeeded.find((r) => r.mode === 'io' && r.status === 'granted');
       if (req) this.release(p.pid, req.resource);
-      this.enqueueReady(p);
+      this.pm.enqueueReady(p);
       this.log('unblock', `${this.label(p.pid)} terminó su E/S → Listo`, p.pid);
     }
   }
 
   /**
-   * Procesa las peticiones de recursos que tocan en este punto de la ejecución.
-   * Devuelve true si el proceso quedó bloqueado (deja la CPU).
+   * Peticiones dinámicas de recursos: el proceso en ejecución pide los recursos que
+   * le tocan en este punto de su ráfaga. Devuelve true si quedó bloqueado (deja la CPU).
    */
   handleRequests(p: Process): boolean {
     for (const req of p.resourcesNeeded) {
       if (req.status !== 'pending' || req.at > p.executedTime) continue;
       const rid = req.resource;
-      const { resources, granted } = requestResource(this.resources, rid, p.pid);
-      this.resources = resources;
-      if (!granted) {
+      if (!this.rm.request(p.pid, rid)) {
         req.status = 'waiting';
         p.state = 'Blocked';
         p.waitingFor = rid;
-        const holder = this.resources[rid].holder!;
-        this.log('block', `${this.label(p.pid)} pide ${this.resources[rid].name}, ocupado por P${holder} → Bloqueado`, p.pid);
+        this.log('block', `${this.label(p.pid)} pide ${this.rm.resources[rid].name}, ocupado por P${this.rm.holderOf(rid)} → Bloqueado`, p.pid);
         return true;
       }
       req.status = 'granted';
       if (!p.heldResources.includes(rid)) p.heldResources.push(rid);
-      this.log('acquire', `${this.label(p.pid)} obtiene ${this.resources[rid].name}`, p.pid);
+      this.log('acquire', `${this.label(p.pid)} obtiene ${this.rm.resources[rid].name}`, p.pid);
       if (req.mode === 'io') {
         p.state = 'Blocked';
         p.ioRemaining = req.duration;
-        this.log('block', `${this.label(p.pid)} inicia E/S en ${this.resources[rid].name} (${req.duration} ticks) → Bloqueado`, p.pid);
+        this.log('block', `${this.label(p.pid)} inicia E/S en ${this.rm.resources[rid].name} (${req.duration} ticks) → Bloqueado`, p.pid);
         return true;
       }
       p.releaseAt[rid] = p.executedTime + req.duration;
@@ -250,80 +228,50 @@ export class Kernel {
     return false;
   }
 
-  // ---------------------------------------------------------------- CPU
+  // ------------------------------------------------------------ CPU (paso 1 del tick)
 
+  /** Terminación: libera memoria y recursos (despertando a quien esperaba). */
   terminate(p: Process, reason = 'terminó') {
     if (p.state === 'Terminated') return;
-    const wasRunning = this.running === p.pid;
+    const wasRunning = this.pm.running === p.pid;
     p.state = 'Terminated';
     p.finishTime = this.tick;
     p.waitingFor = null;
     p.ioRemaining = 0;
-    this.readyQueue = this.readyQueue.filter((pid) => pid !== p.pid);
-    if (wasRunning) this.running = null;
+    this.pm.removeFromReady(p.pid);
+    if (wasRunning) this.pm.running = null;
     if (p.memoryBase !== null) {
-      this.memory = free(this.memory, p.pid);
+      this.mm.release(p.pid);
       p.memoryBase = null;
     }
-    // Sale de cualquier cola de espera y libera lo que retiene (despertando a otros).
-    for (const rid of Object.keys(this.resources) as ResourceId[]) {
-      if (this.resources[rid].queue.includes(p.pid)) this.release(p.pid, rid);
-    }
+    for (const rid of this.rm.queuedIn(p.pid)) this.release(p.pid, rid);
     for (const rid of [...p.heldResources]) this.release(p.pid, rid);
-    const turnaround = p.finishTime - p.arrivalTime;
-    this.log('terminate', `${this.label(p.pid)} ${reason} · retorno ${turnaround} · espera ${p.waitingTime}`, p.pid);
+    this.log('terminate', `${this.label(p.pid)} ${reason} · retorno ${p.finishTime - p.arrivalTime} · espera ${p.waitingTime}`, p.pid);
   }
 
-  /** Despacha el siguiente proceso. Devuelve true si el tick se consumió en un cambio de contexto. */
-  dispatch(): boolean {
-    const next = selectNext(this.readyQueue, this.procs, this.config.policy);
-    if (next === null) return false;
-    this.readyQueue = this.readyQueue.filter((pid) => pid !== next);
-    const p = this.proc(next);
-    p.state = 'Running';
-    p.quantumLeft = p.quantum;
-    p.effectivePriority = p.priority;
-    p.waitStreak = 0;
-    if (p.startTime === null) p.startTime = this.tick;
-    this.running = next;
-    const switched = this.lastPid !== null && this.lastPid !== next;
-    const prev = this.lastPid;
-    this.lastPid = next;
-    if (!switched) {
-      this.log('dispatch', `Despachador: ${this.label(next)} → CPU`, next);
-      return false;
-    }
-    this.contextSwitches++;
-    this.log('context-switch', `Cambio de contexto: guarda PCB de P${prev} → carga PCB de ${this.label(next)}`, next);
-    return this.config.contextSwitchCost > 0;
-  }
-
-  /** Un tick de CPU con Round Robin. */
+  /** Un tick de CPU con Round Robin (despacho, peticiones, ejecución, fin de quantum). */
   runCpu() {
     let used = false;
     let switching = false;
     this.executedPid = null;
 
     for (let guard = 0; !used && guard < 64; guard++) {
-      if (this.running === null) {
-        if (this.readyQueue.length === 0) break;
-        if (this.dispatch()) {
+      if (this.pm.running === null) {
+        if (this.pm.readyQueue.length === 0) break;
+        if (this.pm.dispatch(this.tick)) {
           switching = true;
           used = true;
-          this.overheadTicks++;
+          this.pm.overheadTicks++;
           break;
         }
       }
-      const p = this.proc(this.running!);
+      const p = this.proc(this.pm.running!);
       if (this.handleRequests(p)) {
-        this.running = null;
+        this.pm.running = null;
         continue; // la CPU queda libre: se despacha otro en este mismo tick
       }
 
-      p.remainingTime--;
-      p.executedTime++;
-      p.quantumLeft--;
-      this.busyTicks++;
+      this.pm.executeTick(p);
       used = true;
       this.executedPid = p.pid;
 
@@ -332,47 +280,24 @@ export class Kernel {
         if (at !== undefined && p.executedTime >= at) this.release(p.pid, rid);
       }
 
-      if (p.remainingTime <= 0 && p.interactive) {
-        // Sin trabajo pendiente: el proceso interactivo espera al usuario (no termina).
-        p.state = 'Blocked';
-        p.awaitingInput = true;
-        p.remainingTime = 0;
-        this.running = null;
-      } else if (p.remainingTime <= 0) {
-        this.terminate(p);
-      } else if (p.quantumLeft <= 0) {
-        this.running = null;
-        this.enqueueReady(p);
-        this.log('quantum', `${this.label(p.pid)} agotó su quantum (${p.quantum}) → final de la cola`, p.pid);
-      }
+      if (p.remainingTime <= 0 && p.interactive) this.pm.blockForInput(p);
+      else if (p.remainingTime <= 0) this.terminate(p);
+      else if (p.quantumLeft <= 0) this.pm.preempt(p);
     }
 
-    if (!used) this.idleTicks++;
+    if (!used) this.pm.idleTicks++;
     this.gantt = [...this.gantt, { tick: this.tick, pid: this.executedPid, switching }].slice(-GANTT_LIMIT);
   }
 
-  /** Contabiliza esperas, bloqueos y envejecimiento. */
   accountWaiting() {
-    for (const p of this.procs.values()) {
-      if (p.pid === this.executedPid) continue;
-      const waiting = p.state === 'Ready' || (p.state === 'New' && p.arrivalTime <= this.tick);
-      if (p.state === 'Blocked' && !p.awaitingInput) p.blockedTime++;
-      if (!waiting) continue;
-      p.waitingTime++;
-      p.waitStreak++;
-      if (!this.config.aging) continue;
-      const before = p.effectivePriority;
-      const aged = applyAging(p, this.config.agingInterval);
-      if (aged.effectivePriority !== before) {
-        p.effectivePriority = aged.effectivePriority;
-        if (p.tag === 'starvation' || p.waitStreak >= STARVATION_THRESHOLD) {
-          this.log('aging', `Aging: ${this.label(p.pid)} prioridad ${before} → ${p.effectivePriority}`, p.pid);
-        }
-      }
-    }
+    this.pm.accountWaiting(this.tick, this.executedPid);
   }
 
-  // ---------------------------------------------------------------- Escenarios
+  addWork(p: Process, ticks: number, cap = 8) {
+    this.pm.addWork(p, ticks, cap);
+  }
+
+  // ------------------------------------------------------------ Escenarios y detección (paso 3)
 
   /** Escenario de inanición: genera un proceso prioritario cada 2 ticks mientras dure. */
   generateFlood(rng: Rng) {
@@ -384,38 +309,24 @@ export class Kernel {
 
   /** Los servicios del sistema despiertan de vez en cuando con un poco de trabajo. */
   backgroundWork(rng: Rng) {
-    for (const p of this.procs.values()) {
+    for (const p of this.pm.procs.values()) {
       if (p.kind !== 'system' || !p.awaitingInput || rng() > 0.04) continue;
-      this.addWork(p, 1 + Math.floor(rng() * 3));
-    }
-  }
-
-  /** Añade ráfaga de CPU a un proceso interactivo; si esperaba al usuario, pasa a Listo. */
-  addWork(p: Process, ticks: number, cap = 8) {
-    if (p.state === 'Terminated') return;
-    const added = Math.max(0, Math.min(ticks, cap - p.remainingTime));
-    p.remainingTime += added;
-    p.burstTime += added;
-    if (p.awaitingInput && p.remainingTime > 0) {
-      p.awaitingInput = false;
-      this.enqueueReady(p);
+      this.pm.addWork(p, 1 + Math.floor(rng() * 3));
     }
   }
 
   detectDeadlock() {
-    const cycle = detectDeadlock([...this.procs.values()], this.resources);
+    const cycle = this.rm.detectDeadlock(this.pm.all());
     const isNew = cycle.some((pid) => !this.deadlock.includes(pid));
     if (cycle.length && isNew) {
-      const desc = cycle
-        .map((pid) => `P${pid} espera ${this.resources[this.proc(pid).waitingFor!].name}`)
-        .join(' · ');
+      const desc = cycle.map((pid) => `P${pid} espera ${this.rm.resources[this.proc(pid).waitingFor!].name}`).join(' · ');
       this.log('deadlock', `¡DEADLOCK DETECTADO! Espera circular entre ${cycle.map((p) => 'P' + p).join(' ↔ ')} (${desc})`);
     }
     this.deadlock = cycle;
   }
 
   detectStarvation() {
-    const starving = detectStarvation([...this.procs.values()], this.tick, this.config.policy);
+    const starving = this.pm.detectStarvation(this.tick);
     for (const pid of starving) {
       if (!this.starving.includes(pid)) {
         this.log('starvation', `INANICIÓN: ${this.label(pid)} lleva ${this.proc(pid).waitStreak} ticks esperando ${this.proc(pid).state === 'New' ? 'memoria' : 'CPU'}`, pid);
@@ -424,8 +335,10 @@ export class Kernel {
     this.starving = starving;
   }
 
+  // ------------------------------------------------------------ Estado para la interfaz (paso 4)
+
   recordHistory() {
-    const s = memoryStats(this.memory);
+    const s = this.mm.stats();
     const window = this.gantt.slice(-CPU_WINDOW);
     const busy = window.filter((g) => g.pid !== null).length;
     const point: HistoryPoint = {
@@ -434,8 +347,8 @@ export class Kernel {
       memUsed: Math.round((s.used / s.total) * 1000) / 10,
       memFragmented: Math.round((s.fragmented / s.total) * 1000) / 10,
       memFree: Math.round((s.largestHole / s.total) * 1000) / 10,
-      ready: this.readyQueue.length,
-      blocked: [...this.procs.values()].filter((p) => p.state === 'Blocked').length,
+      ready: this.pm.readyQueue.length,
+      blocked: this.pm.all().filter((p) => p.state === 'Blocked').length,
     };
     this.history = [...this.history, point].slice(-HISTORY_LIMIT);
   }

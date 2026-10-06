@@ -9,7 +9,7 @@ const BOOT_LINES = [
   '[ OK ] Inicializando memoria: 1024 MB, núcleo 128 MB',
   '[ OK ] Particionamiento dinámico (First-Fit)',
   '[ OK ] Planificador Round Robin, quantum = 3',
-  '[ OK ] Registrando dispositivos: HDD, Impresora, USB, R1, R2',
+  '[ OK ] Registrando dispositivos: Disco duro, Impresora, Pantalla, USB',
   '[ OK ] Montando disco virtual',
   '[ OK ] Detector de interbloqueos (grafo de espera)',
   '[ OK ] Iniciando servicios: systemd, escritorio, audiod, red-wifi, indexador',

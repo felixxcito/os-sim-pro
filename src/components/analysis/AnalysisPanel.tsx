@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useSimStore } from '../../store/useSimStore';
+import { useState } from 'react';
+import { useOS } from '../../store/useOS';
 import { Segmented, Stat } from '../ui/primitives';
 import { GanttChart } from './GanttChart';
 import { ProcessActivityChart, ProcessTable, ResourceDonuts, UsageOverTime } from './ResourceCharts';
@@ -7,21 +7,15 @@ import { ProcessActivityChart, ProcessTable, ResourceDonuts, UsageOverTime } fro
 type Tab = 'gantt' | 'activity' | 'usage' | 'donut' | 'table';
 
 export function AnalysisPanel() {
-  const sim = useSimStore((s) => s.sim);
+  const { metrics } = useOS();
   const [tab, setTab] = useState<Tab>('gantt');
-
-  const kpis = useMemo(() => {
-    const done = sim.processes.filter((p) => p.state === 'Terminated' && p.finishTime !== null);
-    const avg = (xs: number[]) => (xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(1) : '—');
-    const total = sim.busyTicks + sim.idleTicks + sim.overheadTicks;
-    return {
-      wait: avg(done.map((p) => p.waitingTime)),
-      turnaround: avg(done.map((p) => p.finishTime! - p.arrivalTime)),
-      throughput: sim.tick ? ((done.length / sim.tick) * 10).toFixed(2) : '—',
-      cpu: total ? `${Math.round((sim.busyTicks / total) * 100)}%` : '—',
-      done: done.length,
-    };
-  }, [sim]);
+  const fmt = (v: number | null) => (v === null ? '—' : v.toFixed(1));
+  const kpis = {
+    wait: fmt(metrics.avgWaiting),
+    turnaround: fmt(metrics.avgTurnaround),
+    throughput: metrics.tick ? (metrics.throughput * 10).toFixed(2) : '—',
+    cpu: metrics.tick ? `${Math.round(metrics.cpuUtilization * 100)}%` : '—',
+  };
 
   return (
     <div className="flex h-full flex-col gap-2 p-3">

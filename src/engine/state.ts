@@ -72,12 +72,20 @@ export const SYSTEM_SERVICES: { name: string; memorySize: number; priority: numb
   { name: 'indexador', memorySize: 48, priority: 8 },
 ];
 
-/** Estado de arranque del SO: solo servicios del sistema; las apps se añaden al abrir ventanas. */
-export function createOsState(): SimState {
+/** Procesos de carga de trabajo con los que arranca el sistema (además de los servicios). */
+export const BOOT_WORKLOAD = 6;
+
+/**
+ * Estado de arranque del SO: 5 servicios del sistema (interactivos, nunca terminan) más
+ * BOOT_WORKLOAD procesos de usuario que llegan escalonados: 11 procesos precargados.
+ * Las aplicaciones se añaden después, al abrir ventanas.
+ */
+export function createOsState(rng: Rng = Math.random): SimState {
   let state = createInitialState();
   for (const svc of SYSTEM_SERVICES) {
     state = addProcess(state, { ...svc, burstTime: 2, arrivalTime: 0, quantum: state.config.quantum, kind: 'system', interactive: true });
   }
+  for (let i = 0; i < BOOT_WORKLOAD; i++) state = addRandomProcess(state, rng, 1 + i * 2);
   return state;
 }
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { resolveDeadlock } from '../../src/engine/actions';
 import { STARVATION_THRESHOLD } from '../../src/engine/constants';
-import { detectDeadlock, launchDeadlockScenario } from '../../src/engine/deadlock';
+import { detectDeadlock, detectDeadlockMatrix, forceDeadlockScenario as launchDeadlockScenario } from '../../src/engine/managers/ResourceManager';
 import { createResources, addProcess, createInitialState } from '../../src/engine/state';
-import { launchStarvationScenario } from '../../src/engine/starvation';
+import { forceStarvationScenario as launchStarvationScenario } from '../../src/engine/managers/ProcessManager';
 import { step } from '../../src/engine/tick';
 import { createProcess } from '../../src/engine/process';
 import type { SimState } from '../../src/types';
@@ -16,18 +16,41 @@ const run = (s: SimState, ticks: number, rng = () => 0.5) => {
 describe('detección de interbloqueo', () => {
   it('encuentra el ciclo en el grafo de espera', () => {
     const resources = createResources();
-    resources.R1.holder = 1;
-    resources.R2.holder = 2;
-    const a = { ...createProcess(1, { name: 'A', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'R2' as const };
-    const b = { ...createProcess(2, { name: 'B', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'R1' as const };
-    const c = { ...createProcess(3, { name: 'C', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'R1' as const };
+    resources.HDD.holder = 1;
+    resources.PRINTER.holder = 2;
+    const a = { ...createProcess(1, { name: 'A', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'PRINTER' as const };
+    const b = { ...createProcess(2, { name: 'B', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'HDD' as const };
+    const c = { ...createProcess(3, { name: 'C', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'HDD' as const };
     expect(detectDeadlock([a, b, c], resources)).toEqual([1, 2]); // C espera pero no está en el ciclo
+  });
+
+  it('el algoritmo de matrices (Silberschatz) llega a la misma conclusión que el grafo', () => {
+    const resources = createResources();
+    resources.HDD.holder = 1;
+    resources.PRINTER.holder = 2;
+    const a = { ...createProcess(1, { name: 'A', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'PRINTER' as const };
+    const b = { ...createProcess(2, { name: 'B', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'HDD' as const };
+    const free = { ...createProcess(3, { name: 'C', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Ready' as const };
+    const m = detectDeadlockMatrix([a, b, free], resources);
+    expect(m.available).toEqual([0, 0, 1, 1]); // Disco e Impresora ocupados; Pantalla y USB libres
+    expect(m.deadlocked).toEqual([1, 2]);
+    expect(m.rows.find((r) => r.pid === 1)!.request).toEqual([0, 1, 0, 0]);
+  });
+
+  it('sin espera circular, el algoritmo de matrices encuentra una secuencia segura', () => {
+    const resources = createResources();
+    resources.HDD.holder = 2;
+    const a = { ...createProcess(1, { name: 'A', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'HDD' as const };
+    const b = { ...createProcess(2, { name: 'B', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Running' as const };
+    const m = detectDeadlockMatrix([a, b], resources);
+    expect(m.deadlocked).toEqual([]);
+    expect(m.rows.every((r) => r.finish)).toBe(true);
   });
 
   it('una cadena de espera sin ciclo no es interbloqueo', () => {
     const resources = createResources();
-    resources.R1.holder = 2;
-    const a = { ...createProcess(1, { name: 'A', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'R1' as const };
+    resources.HDD.holder = 2;
+    const a = { ...createProcess(1, { name: 'A', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 }), state: 'Blocked' as const, waitingFor: 'HDD' as const };
     const b = createProcess(2, { name: 'B', burstTime: 5, arrivalTime: 0, quantum: 2, memorySize: 16 });
     expect(detectDeadlock([a, b], resources)).toEqual([]);
   });
@@ -38,8 +61,8 @@ describe('escenario de interbloqueo', () => {
     let s = launchDeadlockScenario(createInitialState());
     s = run(s, 8);
     expect(s.deadlock).toEqual([1, 2]);
-    expect(s.resources.R1.holder).toBe(1);
-    expect(s.resources.R2.holder).toBe(2);
+    expect(s.resources.HDD.holder).toBe(1);
+    expect(s.resources.PRINTER.holder).toBe(2);
     expect(s.processes.every((p) => p.state === 'Blocked')).toBe(true);
     expect(s.events.some((e) => e.message.includes('DEADLOCK DETECTADO'))).toBe(true);
   });
@@ -57,7 +80,7 @@ describe('escenario de interbloqueo', () => {
     s = resolveDeadlock(s);
     expect(s.deadlock).toEqual([]);
     expect(s.processes[1].state).toBe('Terminated'); // víctima: la más joven (B)
-    expect(s.resources.R2.holder).toBe(1); // A recibe R2
+    expect(s.resources.PRINTER.holder).toBe(1); // A recibe la Impresora
     s = run(s, 20);
     expect(s.processes[0].state).toBe('Terminated');
   });

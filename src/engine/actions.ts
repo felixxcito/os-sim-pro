@@ -1,6 +1,7 @@
 import type { SimConfig, SimState } from '../types';
 import { Kernel } from './kernel';
-import { compact, memoryStats } from './memory';
+import { compact, memoryStats } from './managers/MemoryManager';
+import { chooseVictim } from './managers/ResourceManager';
 import { logEvent } from './state';
 
 /** Acciones del usuario que no dependen del reloj. Todas puras: SimState → SimState. */
@@ -34,8 +35,8 @@ export function updateConfig(state: SimState, patch: Partial<SimConfig>): SimSta
 /** Recuperación del interbloqueo: aborta a la víctima (menor prioridad; si empatan, la más joven). */
 export function resolveDeadlock(state: SimState): SimState {
   if (state.deadlock.length === 0) return state;
-  const victims = state.processes.filter((p) => state.deadlock.includes(p.pid));
-  const victim = victims.reduce((a, b) => (b.priority > a.priority || (b.priority === a.priority && b.pid > a.pid) ? b : a));
+  const victim = chooseVictim(state.processes, state.deadlock);
+  if (!victim) return state;
   const k = new Kernel(state);
   k.log('deadlock', `Recuperación: se aborta a la víctima ${k.label(victim.pid)} para romper la espera circular`, victim.pid);
   k.terminate(k.proc(victim.pid), 'abortado (víctima del interbloqueo)');

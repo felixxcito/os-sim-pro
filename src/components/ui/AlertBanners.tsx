@@ -1,5 +1,7 @@
 import { Hourglass, ShieldAlert } from 'lucide-react';
 import { useSimStore } from '../../store/useSimStore';
+import { RESOURCE_NAMES } from '../../engine/constants';
+import type { ResourceId } from '../../types';
 import { Button } from './primitives';
 
 /** Alertas globales sobre el escritorio: interbloqueo (rojo) e inanición (ámbar). */
@@ -23,7 +25,8 @@ export function AlertBanners({ compact = false }: { compact?: boolean }) {
                 .map((pid) => {
                   const p = byPid.get(pid)!;
                   const holder = p.waitingFor ? sim.resources[p.waitingFor].holder : null;
-                  return `P${pid} retiene ${p.heldResources.join('+') || '—'} y espera ${p.waitingFor} (de P${holder})`;
+                  const name = (id: ResourceId) => RESOURCE_NAMES[id];
+                  return `P${pid} retiene ${p.heldResources.map(name).join(' + ') || '—'} y espera ${p.waitingFor ? name(p.waitingFor) : '—'} (de P${holder})`;
                 })
                 .join(' · ')}
             </div>

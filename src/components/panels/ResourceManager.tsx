@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
-import { Cpu, Disc3, HardDrive, Printer, ScanLine, Usb, type LucideIcon } from 'lucide-react';
+import { Cpu, HardDrive, MemoryStick, Monitor, Printer, Usb, type LucideIcon } from 'lucide-react';
 import { useSimStore } from '../../store/useSimStore';
-import { RESOURCE_IDS } from '../../engine/constants';
-import { waitForGraph } from '../../engine/deadlock';
+import { RESOURCE_IDS, RESOURCE_NAMES } from '../../engine/constants';
+import { memoryStats } from '../../engine/managers/MemoryManager';
+import { detectDeadlockMatrix, waitForGraph } from '../../engine/managers/ResourceManager';
 import type { Process, ResourceId } from '../../types';
 import { ProgressBar, SectionTitle } from '../ui/primitives';
 
-const ICONS: Record<ResourceId, LucideIcon> = { HDD: HardDrive, PRINTER: Printer, USB: Usb, R1: Disc3, R2: ScanLine };
+const ICONS: Record<ResourceId, LucideIcon> = { HDD: HardDrive, PRINTER: Printer, SCREEN: Monitor, USB: Usb };
 
 export function ResourceManager() {
   const sim = useSimStore((s) => s.sim);
@@ -56,6 +57,8 @@ export function ResourceManager() {
           </div>
         </div>
       </div>
+
+      <RamCard />
 
       <div>
         <SectionTitle>Cola de listos (Round Robin)</SectionTitle>
@@ -109,6 +112,80 @@ export function ResourceManager() {
       </div>
 
       <WaitForGraph processes={sim.processes} deadlock={sim.deadlock} />
+      <DetectionMatrix />
+    </div>
+  );
+}
+
+function RamCard() {
+  const memory = useSimStore((s) => s.sim.memory);
+  const m = memoryStats(memory);
+  const pct = Math.round((m.used / m.total) * 100);
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/60 p-3">
+      <div className="rounded-lg bg-fuchsia-500/15 p-2 text-fuchsia-300">
+        <MemoryStick size={22} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-gray-200">RAM</span>
+          <span className="font-mono text-[11px] text-gray-400">
+            {m.used}/{m.total} MB · {m.holes} huecos · frag. {m.externalFragmentation}%
+          </span>
+        </div>
+        <div className="mt-1">
+          <ProgressBar value={pct} max={100} color="#ff00e5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Algoritmo de detección con matrices (Silberschatz §8.7.2): muestra Allocation, Request y
+ * Available, y si cada proceso puede terminar (Finish). Los que quedan en "no" están en interbloqueo.
+ */
+function DetectionMatrix() {
+  const processes = useSimStore((s) => s.sim.processes);
+  const resources = useSimStore((s) => s.sim.resources);
+  const m = useMemo(() => detectDeadlockMatrix(processes, resources), [processes, resources]);
+  const rows = m.rows.filter((r) => r.allocation.some(Boolean) || r.request.some(Boolean));
+  if (rows.length === 0) return null;
+  const short = (id: ResourceId) => RESOURCE_NAMES[id].split(' ')[0];
+  const vec = (v: number[]) => `(${v.join(', ')})`;
+  return (
+    <div>
+      <SectionTitle>Algoritmo de detección (matrices)</SectionTitle>
+      <div className="overflow-x-auto rounded-lg border border-gray-800">
+        <table className="w-full text-center font-mono text-[10px]">
+          <thead className="bg-gray-900 text-gray-500">
+            <tr>
+              <th className="px-1.5 py-1 text-left">Proceso</th>
+              <th className="px-1.5 py-1">Allocation</th>
+              <th className="px-1.5 py-1">Request</th>
+              <th className="px-1.5 py-1">Finish</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.pid} className={`border-t border-gray-800 ${r.finish ? 'text-gray-300' : 'bg-red-500/10 text-red-300'}`}>
+                <td className="px-1.5 py-1 text-left">P{r.pid}</td>
+                <td className="px-1.5 py-1">{vec(r.allocation)}</td>
+                <td className="px-1.5 py-1">{vec(r.request)}</td>
+                <td className="px-1.5 py-1">{r.finish ? `sí (${r.order === null ? 'no retiene' : '#' + (r.order + 1)})` : 'NO'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-1 text-[10px] text-gray-500">
+        Columnas: {m.resources.map(short).join(', ')} · Available = {vec(m.available)} ·{' '}
+        {m.deadlocked.length ? (
+          <span className="text-red-300">interbloqueo en {m.deadlocked.map((p) => 'P' + p).join(', ')}</span>
+        ) : (
+          <span className="text-green-300">existe una secuencia en la que todos terminan</span>
+        )}
+      </p>
     </div>
   );
 }
@@ -129,7 +206,7 @@ function WaitForGraph({ processes, deadlock }: { processes: Process[]; deadlock:
   return (
     <div>
       <SectionTitle>Grafo de espera</SectionTitle>
-      <svg viewBox="0 0 280 160" className="w-full rounded-lg border border-gray-800 bg-gray-950/70" role="img" aria-label="Grafo de espera entre procesos">
+      <svg viewBox="0 0 280 160" className="mx-auto w-full max-w-sm rounded-lg border border-gray-800 bg-gray-950/70" role="img" aria-label="Grafo de espera entre procesos">
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
@@ -144,8 +221,8 @@ function WaitForGraph({ processes, deadlock }: { processes: Process[]; deadlock:
           const [ux, uy] = [dx / len, dy / len];
           const cyc = deadlock.includes(e.from) && deadlock.includes(e.to);
           // Ligeramente curvas para que A→B y B→A no se superpongan.
-          const mx = (a.x + b.x) / 2 - uy * 14;
-          const my = (a.y + b.y) / 2 + ux * 14;
+          const mx = (a.x + b.x) / 2 - uy * 22;
+          const my = (a.y + b.y) / 2 + ux * 22;
           return (
             <g key={`${e.from}-${e.to}`}>
               <path
@@ -156,7 +233,7 @@ function WaitForGraph({ processes, deadlock }: { processes: Process[]; deadlock:
                 markerEnd="url(#arrow)"
               />
               <text x={mx} y={my} fontSize="8" textAnchor="middle" fill={cyc ? '#fca5a5' : '#94a3b8'} className="font-mono">
-                {e.resource}
+                {RESOURCE_NAMES[e.resource]}
               </text>
             </g>
           );
