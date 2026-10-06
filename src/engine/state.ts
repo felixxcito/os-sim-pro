@@ -57,6 +57,30 @@ export function addRandomProcess(state: SimState, rng: Rng = Math.random, delay 
   return addProcess(state, randomSpec(rng, state.tick + delay, state.config.quantum));
 }
 
+/** Registra un proceso y devuelve también su PID (para enlazarlo con una ventana). */
+export function spawnProcess(state: SimState, spec: ProcessSpec): { state: SimState; pid: number } {
+  const pid = state.nextPid;
+  return { state: addProcess(state, spec), pid };
+}
+
+/** Servicios con los que arranca el SO (procesos interactivos de sistema). */
+export const SYSTEM_SERVICES: { name: string; memorySize: number; priority: number }[] = [
+  { name: 'systemd', memorySize: 32, priority: 1 },
+  { name: 'escritorio', memorySize: 64, priority: 2 },
+  { name: 'audiod', memorySize: 16, priority: 3 },
+  { name: 'red-wifi', memorySize: 16, priority: 3 },
+  { name: 'indexador', memorySize: 48, priority: 8 },
+];
+
+/** Estado de arranque del SO: solo servicios del sistema; las apps se añaden al abrir ventanas. */
+export function createOsState(): SimState {
+  let state = createInitialState();
+  for (const svc of SYSTEM_SERVICES) {
+    state = addProcess(state, { ...svc, burstTime: 2, arrivalTime: 0, quantum: state.config.quantum, kind: 'system', interactive: true });
+  }
+  return state;
+}
+
 /** Estado inicial con una carga de trabajo de 12 procesos escalonados. */
 export function createSeededState(rng: Rng = Math.random): SimState {
   let state = createInitialState();

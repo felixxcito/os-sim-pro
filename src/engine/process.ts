@@ -10,6 +10,8 @@ export interface ProcessSpec {
   memorySize: number;
   requests?: Omit<ResourceRequest, 'status'>[];
   tag?: Process['tag'];
+  kind?: Process['kind'];
+  interactive?: boolean;
 }
 
 /** Construye un PCB nuevo en estado New. */
@@ -18,6 +20,9 @@ export function createProcess(pid: number, spec: ProcessSpec): Process {
   return {
     pid,
     name: spec.name,
+    kind: spec.kind ?? 'user',
+    interactive: spec.interactive ?? false,
+    awaitingInput: false,
     state: 'New',
     burstTime: spec.burstTime,
     remainingTime: spec.burstTime,

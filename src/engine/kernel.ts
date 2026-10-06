@@ -325,7 +325,13 @@ export class Kernel {
         if (at !== undefined && p.executedTime >= at) this.release(p.pid, rid);
       }
 
-      if (p.remainingTime <= 0) {
+      if (p.remainingTime <= 0 && p.interactive) {
+        // Sin trabajo pendiente: el proceso interactivo espera al usuario (no termina).
+        p.state = 'Blocked';
+        p.awaitingInput = true;
+        p.remainingTime = 0;
+        this.running = null;
+      } else if (p.remainingTime <= 0) {
         this.terminate(p);
       } else if (p.quantumLeft <= 0) {
         this.running = null;
@@ -343,7 +349,7 @@ export class Kernel {
     for (const p of this.procs.values()) {
       if (p.pid === this.executedPid) continue;
       const waiting = p.state === 'Ready' || (p.state === 'New' && p.arrivalTime <= this.tick);
-      if (p.state === 'Blocked') p.blockedTime++;
+      if (p.state === 'Blocked' && !p.awaitingInput) p.blockedTime++;
       if (!waiting) continue;
       p.waitingTime++;
       p.waitStreak++;
@@ -367,6 +373,26 @@ export class Kernel {
     this.floodTicks--;
     if (this.tick % 2 === 0) this.spawn(floodSpec(rng, this.tick, this.config.quantum));
     if (this.floodTicks === 0) this.log('starvation', 'Fin de la saturación de procesos prioritarios');
+  }
+
+  /** Los servicios del sistema despiertan de vez en cuando con un poco de trabajo. */
+  backgroundWork(rng: Rng) {
+    for (const p of this.procs.values()) {
+      if (p.kind !== 'system' || !p.awaitingInput || rng() > 0.1) continue;
+      this.addWork(p, 1 + Math.floor(rng() * 3));
+    }
+  }
+
+  /** Añade ráfaga de CPU a un proceso interactivo; si esperaba al usuario, pasa a Listo. */
+  addWork(p: Process, ticks: number, cap = 8) {
+    if (p.state === 'Terminated') return;
+    const added = Math.max(0, Math.min(ticks, cap - p.remainingTime));
+    p.remainingTime += added;
+    p.burstTime += added;
+    if (p.awaitingInput && p.remainingTime > 0) {
+      p.awaitingInput = false;
+      this.enqueueReady(p);
+    }
   }
 
   detectDeadlock() {

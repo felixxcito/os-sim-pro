@@ -16,6 +16,7 @@ export function step(state: SimState, rng: Rng = Math.random): SimState {
   const k = new Kernel(state);
   k.tick++;
   k.generateFlood(rng);
+  k.backgroundWork(rng);
   k.admitArrivals();
   k.progressIO();
   k.runCpu();

@@ -42,3 +42,12 @@ export function resolveDeadlock(state: SimState): SimState {
   k.detectDeadlock();
   return k.toState();
 }
+
+/** Interacción del usuario con una ventana: trabajo de CPU para su proceso. */
+export function addWork(state: SimState, pid: number, ticks = 1): SimState {
+  const k = new Kernel(state);
+  const p = k.procs.get(pid);
+  if (!p) return state;
+  k.addWork(p, ticks);
+  return k.toState();
+}

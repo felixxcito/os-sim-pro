@@ -29,10 +29,21 @@ export interface ResourceRequest {
   status: 'pending' | 'waiting' | 'granted' | 'done';
 }
 
+/** user = proceso de carga/escenarios · app = ventana abierta · system = servicio del SO. */
+export type ProcessKind = 'user' | 'app' | 'system';
+
 /** Bloque de Control de Proceso (PCB). */
 export interface Process {
   pid: number;
   name: string;
+  kind: ProcessKind;
+  /**
+   * Proceso interactivo (apps y servicios): no termina al agotar su ráfaga, sino que se
+   * bloquea esperando E/S del usuario; cada interacción le añade trabajo de CPU.
+   */
+  interactive: boolean;
+  /** Bloqueado esperando entrada del usuario (teclado/ratón). */
+  awaitingInput: boolean;
   state: ProcessState;
   burstTime: number;
   remainingTime: number;
