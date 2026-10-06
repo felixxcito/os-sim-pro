@@ -6,11 +6,10 @@ import type { SysInfo } from '../../os/osApi';
 import { fs } from '../../os/fs';
 import { useSession } from '../../os/session';
 import type { AppProps } from '../../os/shell/OsWindowFrame';
-import { Wallpaper, WALLPAPERS } from '../../os/shell/Wallpaper';
 import { PhotoIcon } from '../../components/ui/primitives';
 
 const TABS = [
-  { id: 'personalizar', label: 'Personalizar', icon: Palette },
+  { id: 'personalizar', label: 'Cuenta', icon: Palette },
   { id: 'sistema', label: 'Núcleo y memoria', icon: Cpu },
   { id: 'acerca', label: 'Acerca de', icon: Info },
 ] as const;
@@ -52,27 +51,9 @@ function Personalize() {
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-gray-100">Fondo de pantalla</h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {WALLPAPERS.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              onClick={() => updateSettings({ wallpaper: w.id })}
-              className={`overflow-hidden rounded-lg border-2 text-left ${settings.wallpaper === w.id ? 'border-violet-400' : 'border-transparent hover:border-gray-600'}`}
-            >
-              <div className="relative h-24">
-                <Wallpaper kind={w.id} />
-              </div>
-              <div className="bg-gray-900 px-2 py-1 text-[11px] text-gray-300">{w.name}</div>
-            </button>
-          ))}
-        </div>
-      </section>
-      <section>
         <h3 className="mb-3 text-sm font-semibold text-gray-100">Cuenta</h3>
         <div className="flex items-center gap-3">
-          <PhotoIcon size={56} ring="#b388ff" className="rounded-full" />
+          <PhotoIcon size={56} ring="#b388ff" className="rounded-full" avatar />
           <label className="text-xs text-gray-400">
             Nombre de usuario
             <input

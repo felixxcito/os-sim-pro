@@ -2,7 +2,7 @@
 
 Proyecto universitario de Sistemas Operativos (Felix). Es un **programa de escritorio ejecutable** (.exe para Windows, .dmg para Mac) que simula un sistema operativo completo:
 
-- arranque, inicio de sesión y escritorio con la foto del usuario como fondo y en todos los iconos;
+- arranque, inicio de sesión y escritorio con la foto del usuario como fondo de pantalla (fijo) e iconos con la imagen del chocolate Savoy Carré;
 - ventanas, barra de tareas, menú inicio, notificaciones, Papelera;
 - **Navegador web real** con pestañas y descargas;
 - **Escritor**: procesador de texto tipo Word que abre y guarda `.docx` y exporta a PDF;
@@ -25,9 +25,9 @@ En la pestaña **Releases** del repositorio:
 
 | Sistema | Archivo |
 |---|---|
-| Windows | `OS-Sim-Pro-Setup-2.0.0.exe` (instalador) o `OS-Sim-Pro-2.0.0-portable.exe` (sin instalar) |
-| Mac con chip Apple (M1/M2/M3…) | `OS-Sim-Pro-2.0.0-mac-arm64.dmg` |
-| Mac con Intel | `OS-Sim-Pro-2.0.0-mac-x64.dmg` |
+| Windows | `OS-Sim-Pro-Setup-2.0.1.exe` (instalador) o `OS-Sim-Pro-2.0.1-portable.exe` (sin instalar) |
+| Mac con chip Apple (M1/M2/M3…) | `OS-Sim-Pro-2.0.1-mac-arm64.dmg` |
+| Mac con Intel | `OS-Sim-Pro-2.0.1-mac-x64.dmg` |
 
 ## Desarrollo
 

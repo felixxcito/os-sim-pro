@@ -1,17 +1,32 @@
 # Compila el ejecutable para Windows (.exe) y Mac (.dmg) y lo publica en GitHub Releases.
-# Se ejecuta al subir una etiqueta vX.Y.Z (git tag v2.0.0 && git push --tags) o a mano desde la pestaña Actions.
+# Se ejecuta al subir una etiqueta vX.Y.Z:  git tag v2.0.1 && git push origin v2.0.1
+#
+# 1. release: crea la release como borrador (una sola, para que Mac y Windows no creen dos a la vez).
+# 2. build:   cada sistema compila, prueba y sube sus archivos a ese borrador.
+# 3. publish: cuando ambos terminan, la release se publica.
 name: Release
 
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  TAG: ${{ github.ref_name }}
+
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Crear borrador de la release
+        run: gh release view "$TAG" || gh release create "$TAG" --draft --title "OS-Sim Pro $TAG" --notes-file .github/release-notes.md
+
   build:
+    needs: release
     strategy:
       fail-fast: false
       matrix:
@@ -26,8 +41,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Empaquetar y publicar
+      - name: Empaquetar y subir a la release
         run: npx electron-builder --publish always
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publicar la release
+        run: gh release edit "$TAG" --draft=false --repo "${{ github.repository }}"

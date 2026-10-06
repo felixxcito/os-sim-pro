@@ -40,4 +40,4 @@ publish:
   provider: github
   owner: felixxcito
   repo: os-sim-pro
-  releaseType: release
+  releaseType: draft

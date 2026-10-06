@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FilePlus2, FileText, FolderOpen, FolderPlus, Image, Pencil, RefreshCw, Sheet, SquareTerminal, Trash2 } from 'lucide-react';
+import { FilePlus2, FileText, FolderOpen, FolderPlus, Pencil, RefreshCw, Sheet, SquareTerminal, Trash2 } from 'lucide-react';
 import { APP_IDS, APP_META, type AppId } from '../apps/meta';
 import { fs, onFsChange, type FsEntry } from '../fs';
 import { openPath } from '../openFile';
@@ -84,7 +84,6 @@ export function DesktopSurface() {
       { separator: true },
       { label: 'Abrir terminal', icon: <SquareTerminal size={14} />, onClick: () => openApp('terminal', { path: DESKTOP }) },
       { label: 'Abrir carpeta Escritorio', icon: <FolderOpen size={14} />, onClick: () => openApp('files', { path: DESKTOP }) },
-      { label: 'Cambiar fondo de pantalla…', icon: <Image size={14} />, onClick: () => openApp('settings', { tab: 'personalizar' }) },
       { label: 'Actualizar', icon: <RefreshCw size={14} />, onClick: refresh },
     ]);
 

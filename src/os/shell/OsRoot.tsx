@@ -31,13 +31,12 @@ export function OsRoot() {
 }
 
 function DesktopSession() {
-  const wallpaper = useSession((s) => s.settings.wallpaper);
   const windows = useWm((s) => s.windows);
   useKernelBridge();
 
   return (
     <main className="relative h-full w-full overflow-hidden">
-      <Wallpaper kind={wallpaper} />
+      <Wallpaper />
       <DesktopSurface />
       {windows.map((w) => (
         <OsWindowFrame key={w.id} win={w} Body={APP_COMPONENTS[w.appId]} />

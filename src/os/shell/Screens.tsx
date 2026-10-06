@@ -69,14 +69,14 @@ export function LockScreen() {
 
   return (
     <div className="relative h-full overflow-hidden">
-      <Wallpaper kind={settings.wallpaper} blur />
+      <Wallpaper blur />
       <div className="relative flex h-full flex-col items-center justify-between py-16 text-white">
         <div className="text-center [text-shadow:0_2px_12px_rgb(0_0_0/0.6)]">
           <div className="font-mono text-7xl font-bold tabular-nums">{now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div>
           <div className="mt-2 text-lg capitalize">{now.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
         </div>
         <div className="flex flex-col items-center gap-4">
-          <PhotoIcon size={128} ring="#00e5ff" className="rounded-full" />
+          <PhotoIcon size={128} ring="#00e5ff" className="rounded-full" avatar />
           <div className="text-2xl font-semibold [text-shadow:0_2px_8px_rgb(0_0_0/0.7)]">{settings.user}</div>
           <button
             type="button"

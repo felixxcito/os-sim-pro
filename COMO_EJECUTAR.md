@@ -11,13 +11,13 @@ Hay dos formas:
 > El repositorio es **privado**: para descargar hay que iniciar sesión en GitHub con una cuenta que tenga acceso.
 
 1. Entra a **https://github.com/felixxcito/os-sim-pro/releases**.
-2. En la versión más reciente (**v2.0.0**), abre *Assets* y descarga el archivo de tu sistema:
+2. En la versión más reciente (**v2.0.1**), abre *Assets* y descarga el archivo de tu sistema:
 
 | Tu computadora | Archivo |
 |---|---|
-| Windows | `OS-Sim-Pro-Setup-2.0.0.exe` (instalador) o `OS-Sim-Pro-2.0.0-portable.exe` (se abre sin instalar) |
-| Mac con chip Apple (M1, M2, M3…) | `OS-Sim-Pro-2.0.0-mac-arm64.dmg` |
-| Mac con procesador Intel | `OS-Sim-Pro-2.0.0-mac-x64.dmg` |
+| Windows | `OS-Sim-Pro-Setup-2.0.1.exe` (instalador) o `OS-Sim-Pro-2.0.1-portable.exe` (se abre sin instalar) |
+| Mac con chip Apple (M1, M2, M3…) | `OS-Sim-Pro-2.0.1-mac-arm64.dmg` |
+| Mac con procesador Intel | `OS-Sim-Pro-2.0.1-mac-x64.dmg` |
 
 ¿No sabes qué Mac tienes? Menú  → *Acerca de esta Mac*: si dice "Chip Apple M…" es arm64; si dice "Intel", es la otra.
 

@@ -106,11 +106,15 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
   );
 }
 
-/** Avatar con la foto del usuario: se usa en todos los iconos del sistema. */
-export function PhotoIcon({ size = 20, ring, className = '' }: { size?: number; ring?: string; className?: string }) {
+/**
+ * Imagen de icono del sistema. Todos los iconos usan la misma imagen (icon-*.png);
+ * con `avatar` se muestra la foto del usuario (inicio de sesión, menú inicio, cuenta).
+ */
+export function PhotoIcon({ size = 20, ring, className = '', avatar = false }: { size?: number; ring?: string; className?: string; avatar?: boolean }) {
+  const file = avatar ? 'avatar' : 'icon';
   return (
     <img
-      src={size > 48 ? '/assets/icon-256.png' : '/assets/icon-64.png'}
+      src={`/assets/${file}-${size > 48 ? 256 : 64}.png`}
       alt=""
       width={size}
       height={size}

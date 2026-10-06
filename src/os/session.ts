@@ -2,12 +2,9 @@ import { create } from 'zustand';
 import type { ReactNode } from 'react';
 
 export type Phase = 'boot' | 'lock' | 'desktop' | 'shutdown';
-export type Wallpaper = 'photo' | 'photo-blur' | 'photo-bw' | 'neon' | 'midnight';
 
 export interface Settings {
   user: string;
-  wallpaper: Wallpaper;
-  accent: string;
 }
 
 export interface OsNotification {
@@ -20,11 +17,12 @@ export interface OsNotification {
 }
 
 const SETTINGS_KEY = 'os-sim-settings';
-const DEFAULTS: Settings = { user: 'Felix', wallpaper: 'photo', accent: '#00e5ff' };
+const DEFAULTS: Settings = { user: 'Felix' };
 
 function loadSettings(): Settings {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') };
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
+    return { user: typeof saved.user === 'string' && saved.user ? saved.user : DEFAULTS.user };
   } catch {
     return DEFAULTS;
   }
