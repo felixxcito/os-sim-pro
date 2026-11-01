@@ -1,8 +1,23 @@
 # OS-Sim Pro — Simulador de Sistema Operativo de escritorio
 
+<!-- teaser:start -->
+<p align="center">
+<img src="docs/screenshots/01-administrador-tareas.jpg" width="32%" alt="Administrador de tareas con procesos, estados, quantum y progreso"> <img src="docs/screenshots/02-gantt-round-robin.jpg" width="32%" alt="Diagrama de Gantt del planificador Round Robin en 4 CPU"> <img src="docs/screenshots/03-memoria-first-fit.jpg" width="32%" alt="Memoria con particionado dinámico, First-Fit y fragmentación externa">
+</p>
+
+<details><summary>Más capturas</summary>
+
+<p align="center">
+<img src="docs/screenshots/04-interbloqueo.jpg" width="48%" alt="Detección de interbloqueo con grafo de espera y matrices" title="Detección de interbloqueo con grafo de espera y matrices"> <img src="docs/screenshots/05-escritor.jpg" width="48%" alt="Procesador de texto Escritor dentro del escritorio simulado" title="Procesador de texto Escritor dentro del escritorio simulado"> <img src="docs/screenshots/06-hojas.jpg" width="48%" alt="Hoja de cálculo con fórmulas (SUM)" title="Hoja de cálculo con fórmulas (SUM)">
+</p>
+
+</details>
+<!-- teaser:end -->
+
+
 Proyecto universitario de Sistemas Operativos (Felix). Es un **programa de escritorio ejecutable** (.exe para Windows, .dmg para Mac) que simula un sistema operativo completo:
 
-- arranque, inicio de sesión y escritorio con la foto del usuario como fondo de pantalla (fijo) e iconos con la imagen del chocolate Savoy Carré;
+- arranque, inicio de sesión y escritorio con fondo de pantalla fijo e iconos con la imagen del chocolate Savoy Carré;
 - ventanas, barra de tareas, menú inicio, notificaciones, Papelera;
 - **Navegador web real** con pestañas y descargas;
 - **Escritor**: procesador de texto tipo Word que abre y guarda `.docx` y exporta a PDF;
